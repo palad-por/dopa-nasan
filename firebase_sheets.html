@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Firebase Sheets V8 - Paste & Fix Login</title>
+    <title>Firebase Sheets V10 - Complete</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -129,9 +129,9 @@
             const thead = document.getElementById('tHead');
             const tbody = document.getElementById('tBody');
             
-            let thHtml = '<tr><th class="w-10">No.</th>';
-            schema.cols.forEach(c => { thHtml += `<th>${c.label}</th>`; });
-            thHtml += '<th class="w-10">ลบ</th></tr>';
+            let thHtml = '<tr><th class="w-12">No.</th>';
+            schema.cols.forEach(c => { thHtml += `<th class="p-3">${c.label}</th>`; });
+            thHtml += '<th class="w-12">ลบ</th></tr>';
             thead.innerHTML = thHtml;
 
             let tbHtml = '';
@@ -139,9 +139,9 @@
                 tbHtml += `<tr><td class="row-num">${rowIndex + 1}</td>`;
                 schema.cols.forEach(c => {
                     let val = row[c.key] !== undefined ? row[c.key] : '';
-                    tbHtml += `<td><input type="text" class="sheet-input" value="${val}" onchange="updateCell(${rowIndex}, '${c.key}', this.value)"></td>`;
+                    tbHtml += `<td class="p-1"><input type="text" class="sheet-input" value="${val}" onchange="updateCell(${rowIndex}, '${c.key}', this.value)"></td>`;
                 });
-                tbHtml += `<td class="text-center bg-slate-50"><button onclick="deleteRow(${rowIndex})" class="text-red-400 hover:text-red-600 px-2 py-1"><i class="fa-solid fa-times"></i></button></td></tr>`;
+                tbHtml += `<td class="text-center bg-slate-50"><button onclick="deleteRow(${rowIndex})" class="text-red-400 hover:text-red-600 px-3 py-2"><i class="fa-solid fa-times"></i></button></td></tr>`;
             });
             tbody.innerHTML = tbHtml;
             document.getElementById('recordCount').innerText = `จำนวน: ${tableData.length} แถว`;
@@ -207,7 +207,7 @@
 
             const result = await Swal.fire({
                 title: 'ยืนยันการบันทึก?',
-                text: `คุณกำลังจะบันทึกข้อมูลตาราง ${currentTable} จำนวน ${tableData.length} แถวขึ้น Firebase`,
+                text: `กำลังบันทึกข้อมูลตาราง ${currentTable} จำนวน ${tableData.length} แถว`,
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#10b981'
@@ -247,12 +247,12 @@
 
     <style>
         body { font-family: 'Sarabun', sans-serif; background-color: #f8fafc; margin: 0; height: 100vh; display: flex; flex-direction: column; }
-        .sheet-table { border-collapse: collapse; width: 100%; background: white; }
-        .sheet-table th { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 8px; font-size: 12px; font-weight: bold; text-align: center; color: #475569; position: sticky; top: 0; z-index: 10; }
-        .sheet-table td { border: 1px solid #cbd5e1; padding: 0; position: relative; }
-        .sheet-input { width: 100%; height: 100%; min-height: 30px; border: none; padding: 4px 8px; font-size: 13px; outline: none; background: transparent; }
-        .sheet-input:focus { box-shadow: inset 0 0 0 2px #4f46e5; background: #eef2ff; }
-        .row-num { background: #f8fafc; text-align: center; font-size: 11px; color: #94a3b8; width: 40px; font-weight: bold; user-select: none; }
+        .sheet-table { border-collapse: collapse; width: 100%; background: white; min-width: 700px; }
+        .sheet-table th { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 10px; font-size: 13px; font-weight: bold; text-align: center; color: #475569; position: sticky; top: 0; z-index: 10; }
+        .sheet-table td { border: 1px solid #cbd5e1; padding: 4px; position: relative; }
+        .sheet-input { width: 100%; min-height: 36px; border: 1px solid transparent; padding: 6px 10px; font-size: 14px; outline: none; background: transparent; border-radius: 4px; }
+        .sheet-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2); background: #ffffff; }
+        .row-num { background: #f8fafc; text-align: center; font-size: 12px; color: #94a3b8; width: 50px; font-weight: bold; user-select: none; }
         .custom-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     </style>
@@ -263,7 +263,7 @@
         <div class="flex items-center gap-3">
             <i class="fa-solid fa-table-cells text-2xl text-indigo-300"></i>
             <div>
-                <h1 class="font-bold text-lg leading-tight">Firebase Sheets V8 (Paste & Fix)</h1>
+                <h1 class="font-bold text-lg leading-tight">Firebase Sheets V10 (Complete)</h1>
                 <p id="authStatus" class="text-[10px] text-indigo-200">กำลังเชื่อมต่อ...</p>
             </div>
         </div>
