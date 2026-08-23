@@ -3,64 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>นำเข้าฐานข้อมูล DOPA NASAN Score 2570</title>
+    <title>นำเข้าฐานข้อมูล DOPA NASAN Score 2570 (V.Pro)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- ตัวช่วยอ่านไฟล์ Excel (SheetJS) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
-    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style> 
         body { font-family: 'Sarabun', sans-serif; background-color: #f8fafc; } 
         .custom-scroll::-webkit-scrollbar { width: 6px; }
-        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-track { background: #0f172a; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 4px; }
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
 
-    <div class="bg-white p-6 md:p-8 rounded-3xl shadow-xl w-full max-w-2xl border-t-4 border-indigo-600">
-        <h2 class="text-2xl font-bold text-slate-800 mb-2"><i class="fa-solid fa-file-excel text-green-600 mr-2"></i>เครื่องมือนำเข้าฐานข้อมูลจริง</h2>
-        <p class="text-sm text-slate-500 mb-6">อัปโหลดไฟล์ <span class="font-bold text-indigo-600">DOPA NASAN Score 2570.xlsx</span> เพื่อดึงข้อมูลทุกแผ่นงาน</p>
+    <div class="bg-white p-6 md:p-8 rounded-3xl shadow-2xl w-full max-w-3xl border-t-4 border-indigo-600">
+        <div class="flex items-center gap-3 mb-2">
+            <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-2xl"><i class="fa-solid fa-database"></i></div>
+            <div>
+                <h2 class="text-2xl font-bold text-slate-800">เครื่องมือนำเข้าข้อมูลอัจฉริยะ</h2>
+                <p class="text-sm text-slate-500">สำหรับไฟล์ DOPA NASAN Score 2570.xlsx</p>
+            </div>
+        </div>
         
-        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 text-sm text-slate-700 mb-6 shadow-sm">
-            <p class="font-bold mb-2">แผ่นงาน (Sheet) ที่ระบบจะดึงข้อมูลอัตโนมัติ:</p>
-            <ul class="list-disc pl-5 space-y-1 text-xs">
-                <li><b class="text-indigo-600">bookkon</b> : รายชื่อบุคลากร คะแนนรวม และพื้นที่</li>
-                <li><b class="text-indigo-600">score_logs</b> : ประวัติการให้คะแนน/หักคะแนนย้อนหลัง</li>
-                <li><b class="text-indigo-600">requests_appeals</b> : ประวัติการส่งคำร้องและอุทธรณ์</li>
-                <li><b class="text-indigo-600">user_config</b> : รายชื่อผู้ใช้งาน (Admin / ปลัดตำบล)</li>
-            </ul>
+        <div id="authWarning" class="hidden mt-4 mb-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-xl">
+            <h3 class="text-red-800 font-bold text-sm"><i class="fa-solid fa-triangle-exclamation"></i> พบปัญหาการเชื่อมต่อ Firebase</h3>
+            <p class="text-sm text-red-600 mt-1" id="authErrorText"></p>
         </div>
 
-        <input type="file" id="excelFile" accept=".xlsx, .xls" class="w-full p-6 border-2 border-dashed border-indigo-300 rounded-xl mb-4 bg-indigo-50/50 cursor-pointer text-sm font-bold text-indigo-700 hover:bg-indigo-50 transition">
-        
-        <button onclick="importData()" id="importBtn" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg active:scale-95 text-base flex items-center justify-center gap-2">
-            <i class="fa-solid fa-cloud-arrow-up"></i> เริ่มอ่านไฟล์และนำเข้าข้อมูล
-        </button>
+        <div class="mt-6">
+            <input type="file" id="excelFile" accept=".xlsx, .xls" class="w-full p-4 border-2 border-dashed border-slate-300 rounded-xl mb-4 bg-slate-50 cursor-pointer text-sm font-bold text-slate-600 hover:bg-slate-100 hover:border-indigo-400 transition outline-none">
+            
+            <button onclick="startImport()" id="importBtn" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg active:scale-95 text-base flex items-center justify-center gap-2">
+                <i class="fa-solid fa-play"></i> เริ่มอ่านไฟล์และนำเข้าข้อมูล
+            </button>
+        </div>
 
         <div id="statusArea" class="mt-8 hidden">
             <div class="flex justify-between text-sm font-bold text-slate-700 mb-2">
-                <span>ความคืบหน้าภาพรวม:</span>
-                <span id="progressText" class="text-indigo-600">กำลังเตรียมข้อมูล...</span>
+                <span>สถานะการทำงาน:</span>
+                <span id="progressText" class="text-indigo-600">กำลังเตรียมการ...</span>
             </div>
             
-            <p class="text-xs font-bold text-slate-500 mb-2">บันทึกการทำงาน (Log):</p>
-            <div id="logArea" class="p-4 bg-slate-900 text-emerald-400 font-mono text-[11px] md:text-xs h-64 overflow-y-auto rounded-xl custom-scroll shadow-inner leading-relaxed">
-                <!-- Log จะแสดงตรงนี้ -->
+            <div class="w-full bg-slate-100 rounded-full h-3 mb-3 shadow-inner overflow-hidden">
+                <div id="progressBar" class="bg-gradient-to-r from-indigo-500 to-purple-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
             </div>
+
+            <div id="logArea" class="p-4 bg-slate-900 text-emerald-400 font-mono text-[11px] md:text-xs h-64 overflow-y-auto rounded-xl custom-scroll shadow-inner leading-relaxed"></div>
         </div>
     </div>
 
     <script>
-        // ตั้งค่า Firebase Configuration ของคุณปลัดปอ
         const firebaseConfig = {
           apiKey: "AIzaSyBPC8Wcv5InhI9O-2aMfvclF3fBtqSo1xo",
           authDomain: "dopa-nasan-score.firebaseapp.com",
@@ -81,13 +81,27 @@
             let color = 'text-emerald-400';
             if (type === 'error') color = 'text-red-400 font-bold';
             if (type === 'info') color = 'text-sky-300';
+            if (type === 'warn') color = 'text-amber-300';
             if (type === 'success') color = 'text-yellow-300 font-bold';
-            
             l.innerHTML += `<div class="${color} mb-1.5">> ${msg}</div>`;
-            l.scrollTop = l.scrollHeight; // เลื่อนจอลงอัตโนมัติ
+            l.scrollTop = l.scrollHeight;
         }
 
-        // ฟังก์ชันช่วยบันทึกแบบ Batch (ทีละ 400 รายการ) เพื่อไม่ให้ Firebase โหลดหนัก
+        async function checkAuthAndFirestore() {
+            try {
+                await auth.signInAnonymously();
+                return true;
+            } catch (error) {
+                document.getElementById('authWarning').classList.remove('hidden');
+                if (error.code === 'auth/operation-not-allowed') {
+                    document.getElementById('authErrorText').innerHTML = "คุณลืมเปิดใช้งานการล็อกอินแบบไม่ระบุตัวตน (Anonymous)!<br><b>วิธีแก้:</b> ไปที่ Firebase Console > Authentication > Sign-in method > กด Add new provider > เลือก <b>Anonymous</b> และกด <b>Enable</b> จากนั้นกด Save แล้วกลับมากดนำเข้าใหม่ครับ";
+                } else {
+                    document.getElementById('authErrorText').innerText = "ข้อผิดพลาดระบบ: " + error.message;
+                }
+                return false;
+            }
+        }
+
         async function commitBatches(operations) {
             let batch = db.batch();
             let count = 0;
@@ -97,7 +111,7 @@
                 batch.set(op.ref, op.data);
                 count++;
                 if(count === 400) {
-                    log(`กำลังบันทึกชุดข้อมูลที่ ${batchCount}...`, 'info');
+                    log(`กำลังบันทึกชุดข้อมูลที่ ${batchCount} สู่ Firebase...`, 'info');
                     await batch.commit();
                     batch = db.batch();
                     count = 0;
@@ -105,207 +119,190 @@
                 }
             }
             if(count > 0) {
-                log(`กำลังบันทึกชุดข้อมูลที่ ${batchCount}...`, 'info');
+                log(`กำลังบันทึกชุดข้อมูลสุดท้าย...`, 'info');
                 await batch.commit();
             }
         }
 
-        async function importData() {
+        const cleanStr = (val) => String(val || '').trim();
+        const cleanNum = (val) => parseFloat(val) || 0;
+
+        async function startImport() {
             const fileInput = document.getElementById('excelFile');
-            if (!fileInput.files.length) return alert('กรุณาเลือกไฟล์ Excel (.xlsx) ก่อนครับ');
+            if (!fileInput.files.length) return Swal.fire('แจ้งเตือน', 'กรุณาเลือกไฟล์ Excel ก่อนครับ', 'warning');
 
             const btn = document.getElementById('importBtn');
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังประมวลผลไฟล์...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังตรวจสอบระบบ...';
             document.getElementById('statusArea').classList.remove('hidden');
-            document.getElementById('logArea').innerHTML = ''; // Clear log
-            log('เริ่มอ่านไฟล์ Excel...', 'info');
+            document.getElementById('authWarning').classList.add('hidden');
+            document.getElementById('logArea').innerHTML = '';
 
-            try {
-                // ล็อกอินเข้าใช้งาน
-                await auth.signInAnonymously();
-                log('เชื่อมต่อฐานข้อมูล Firebase สำเร็จ', 'success');
-
-                const file = fileInput.files[0];
-                const reader = new FileReader();
-
-                reader.onload = async function(e) {
-                    try {
-                        const data = new Uint8Array(e.target.result);
-                        const workbook = XLSX.read(data, {type: 'array'});
-                        log(`อ่านไฟล์สำเร็จ พบแผ่นงาน: ${workbook.SheetNames.join(', ')}`, 'info');
-                        
-                        let operations = []; // เก็บคำสั่งเตรียมบันทึกทั้งหมด
-
-                        // ============================================
-                        // 1. ดึงข้อมูลบุคลากร (bookkon)
-                        // ============================================
-                        if (workbook.Sheets['bookkon']) {
-                            log(`กำลังดึงข้อมูลแผ่นงาน: bookkon...`);
-                            const rows = XLSX.utils.sheet_to_json(workbook.Sheets['bookkon'], { header: 1, defval: "" });
-                            let added = 0;
-                            for (let i = 1; i < rows.length; i++) {
-                                let r = rows[i];
-                                if (!r[0]) continue;
-                                
-                                let idCard = String(r[0]).replace(/\D/g, ''); // ตัดขีดออก
-                                let fullName = String(r[1]).trim();
-                                let position = String(r[2]).trim();
-                                let moo = String(r[6]).replace(/\D/g, '');
-                                let rawVillage = String(r[7]).trim();
-                                let subdistrict = String(r[8]).trim();
-                                let totalScore = parseFloat(r[17]) || 0;
-                                let village = rawVillage ? `หมู่ที่ ${moo} ${rawVillage}` : '';
-                                
-                                const ref = db.collection(`${basePath}/officials`).doc(idCard);
-                                operations.push({ ref, data: { idCard, fullName, position, moo, rawVillage, village, subdistrict, totalScore } });
-                                added++;
-                            }
-                            log(`[bookkon] เตรียมบันทึก ${added} รายการ`, 'success');
-                        }
-
-                        // ============================================
-                        // 2. ดึงข้อมูลผู้ใช้งานระบบ (user_config)
-                        // ============================================
-                        if (workbook.Sheets['user_config']) {
-                            log(`กำลังดึงข้อมูลแผ่นงาน: user_config...`);
-                            const rows = XLSX.utils.sheet_to_json(workbook.Sheets['user_config'], { header: 1, defval: "" });
-                            let added = 0;
-                            for (let i = 1; i < rows.length; i++) {
-                                let r = rows[i];
-                                if (!r[0]) continue;
-                                
-                                let username = String(r[0]).trim();
-                                let password = String(r[1]).trim();
-                                let role = String(r[2]).trim();
-                                let filter = String(r[3]).trim();
-                                let name = String(r[4]).trim();
-                                
-                                const ref = db.collection(`${basePath}/users_config`).doc(username);
-                                operations.push({ ref, data: { username, password, role, filter, name } });
-                                added++;
-                            }
-                            log(`[user_config] เตรียมบันทึก ${added} รายการ`, 'success');
-                        }
-
-                        // ============================================
-                        // 3. ดึงข้อมูลประวัติคะแนน (score_logs)
-                        // ============================================
-                        if (workbook.Sheets['score_logs']) {
-                            log(`กำลังดึงข้อมูลแผ่นงาน: score_logs...`);
-                            const rows = XLSX.utils.sheet_to_json(workbook.Sheets['score_logs'], { header: 1, defval: "" });
-                            let added = 0;
-                            for (let i = 1; i < rows.length; i++) {
-                                let r = rows[i];
-                                if (!r[2]) continue; // ข้ามถ้าไม่มีเลขบัตร
-                                
-                                let tsStr = String(r[0]).trim();
-                                let dateStr = String(r[1]).trim();
-                                let idCard = String(r[2]).replace(/\D/g, '');
-                                let fullName = String(r[3]).trim();
-                                let categoryId = String(r[4]).trim();
-                                let activityName = String(r[5]).trim();
-                                let activityDetail = String(r[6]).trim();
-                                let score = parseFloat(r[7]) || 0;
-                                let type = String(r[8]).trim();
-                                let recordedBy = String(r[9]).trim();
-                                let proofUrl = String(r[10]).trim();
-                                
-                                let timestamp = firebase.firestore.FieldValue.serverTimestamp();
-                                if (tsStr) {
-                                    let d = new Date(tsStr);
-                                    if (!isNaN(d.getTime())) timestamp = firebase.firestore.Timestamp.fromDate(d);
-                                }
-                                
-                                const ref = db.collection(`${basePath}/score_logs`).doc(); // สร้าง ID อัตโนมัติ
-                                operations.push({ ref, data: { idCard, fullName, categoryId, activityName, activityDetail, score, type, recordedBy, proofUrl, dateStr, timestamp } });
-                                added++;
-                            }
-                            log(`[score_logs] เตรียมบันทึก ${added} รายการ`, 'success');
-                        }
-
-                        // ============================================
-                        // 4. ดึงข้อมูลคำร้อง/อุทธรณ์ (requests_appeals)
-                        // ============================================
-                        if (workbook.Sheets['requests_appeals']) {
-                            log(`กำลังดึงข้อมูลแผ่นงาน: requests_appeals...`);
-                            const rows = XLSX.utils.sheet_to_json(workbook.Sheets['requests_appeals'], { header: 1, defval: "" });
-                            let added = 0;
-                            for (let i = 1; i < rows.length; i++) {
-                                let r = rows[i];
-                                if (!r[0] || !r[3]) continue; // ข้ามถ้าไม่มี ID คำร้อง หรือเลขบัตร
-                                
-                                let reqId = String(r[0]).trim();
-                                let tsStr = String(r[1]).trim();
-                                let type = String(r[2]).trim();
-                                let officialId = String(r[3]).replace(/\D/g, '');
-                                let fullName = String(r[4]).trim();
-                                let categoryId = String(r[5]).trim();
-                                let activityName = String(r[6]).trim();
-                                let detail = String(r[7]).trim();
-                                let reqScore = parseFloat(r[8]) || 0;
-                                let fileUrl = String(r[9]).trim();
-                                let statTam = String(r[10]).trim();
-                                let statDist = String(r[11]).trim();
-                                let approvedScore = parseFloat(r[12]) || 0;
-                                let refLogId = String(r[13]).trim();
-                                
-                                let timestamp = firebase.firestore.FieldValue.serverTimestamp();
-                                let dateStr = "";
-                                if (tsStr) {
-                                    let d = new Date(tsStr);
-                                    if (!isNaN(d.getTime())) {
-                                        timestamp = firebase.firestore.Timestamp.fromDate(d);
-                                        dateStr = d.toLocaleDateString('th-TH');
-                                    }
-                                }
-                                
-                                const ref = db.collection(`${basePath}/requests`).doc(reqId);
-                                operations.push({ ref, data: { type, officialId, fullName, categoryId, activityName, detail, reqScore, fileUrl, statTam, statDist, approvedScore, refLogId, dateStr, timestamp } });
-                                added++;
-                            }
-                            log(`[requests_appeals] เตรียมบันทึก ${added} รายการ`, 'success');
-                        }
-
-                        // ------------------------------------------------------------------
-                        // เริ่มนำข้อมูลทั้งหมดขึ้นฐานข้อมูล Firebase
-                        // ------------------------------------------------------------------
-                        const totalOperations = operations.length;
-                        if (totalOperations === 0) {
-                            throw new Error("ไม่พบข้อมูลที่จะนำเข้า กรุณาตรวจสอบชื่อแผ่นงานในไฟล์ Excel");
-                        }
-
-                        document.getElementById('progressText').innerText = `กำลังบันทึกข้อมูลเข้า Firebase...`;
-                        log(`==== กำลังส่งข้อมูลจำนวน ${totalOperations} รายการ ขึ้นฐานข้อมูล Firebase ====`, 'info');
-                        
-                        await commitBatches(operations);
-
-                        log(`🎉 อัปโหลดข้อมูลเสร็จสมบูรณ์ทั้ง ${totalOperations} รายการ!`, 'success');
-                        document.getElementById('progressText').innerText = `เสร็จสมบูรณ์!`;
-                        btn.innerHTML = '<i class="fa-solid fa-check-circle"></i> นำเข้าข้อมูลสำเร็จ';
-                        btn.classList.replace('bg-indigo-600', 'bg-emerald-600');
-                        btn.classList.replace('hover:bg-indigo-700', 'hover:bg-emerald-700');
-                        
-                        Swal.fire('สำเร็จ', 'นำเข้าฐานข้อมูลไปยัง Firebase สำเร็จเรียบร้อย สามารถเปิดเว็บใช้งานได้เลยครับ', 'success');
-
-                    } catch (err) {
-                        log(`ข้อผิดพลาดในการประมวลผล: ${err.message}`, 'error');
-                        btn.innerHTML = 'เกิดข้อผิดพลาด';
-                        btn.classList.replace('bg-indigo-600', 'bg-red-600');
-                        btn.disabled = false;
-                    }
-                };
-
-                reader.readAsArrayBuffer(file);
-
-            } catch(err) {
-                log(`ข้อผิดพลาดการเชื่อมต่อ: ${err.message}`, 'error');
-                btn.innerHTML = 'เกิดข้อผิดพลาด';
+            const isAuthOk = await checkAuthAndFirestore();
+            if (!isAuthOk) {
+                btn.innerHTML = 'เกิดข้อผิดพลาด (ดูด้านบน)';
+                btn.classList.replace('bg-indigo-600', 'bg-red-600');
                 btn.disabled = false;
+                return;
             }
+
+            log('✅ เชื่อมต่อ Firebase และระบบยืนยันตัวตนสำเร็จ', 'success');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังอ่านแผ่นงานทั้งหมด...';
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = async function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    log(`พบแผ่นงาน: ${workbook.SheetNames.join(', ')}`, 'info');
+                    
+                    let operations = [];
+                    
+                    // Helper เพื่อหาชื่อ Sheet แบบยืดหยุ่น (ตัวพิมพ์เล็ก/ใหญ่ หรือมีเว้นวรรค)
+                    const getSheet = (keyword) => workbook.SheetNames.find(n => n.toLowerCase().includes(keyword.toLowerCase()));
+
+                    // 1. bookkon
+                    const sBookkon = getSheet('bookkon');
+                    if (sBookkon) {
+                        log(`กำลังเตรียมข้อมูลบุคลากร [${sBookkon}]...`);
+                        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sBookkon], { header: 1, defval: "" });
+                        for (let i = 1; i < rows.length; i++) {
+                            let r = rows[i];
+                            if (!r[0]) continue;
+                            let idCard = cleanStr(r[0]).replace(/\D/g, '');
+                            let fullName = cleanStr(r[1]);
+                            let moo = cleanStr(r[6]).replace(/\D/g, '');
+                            let rawVillage = cleanStr(r[7]);
+                            let data = {
+                                idCard: idCard,
+                                fullName: fullName,
+                                position: cleanStr(r[2]),
+                                moo: moo,
+                                rawVillage: rawVillage,
+                                village: rawVillage ? `หมู่ที่ ${moo} ${rawVillage}` : '',
+                                subdistrict: cleanStr(r[8]),
+                                totalScore: cleanNum(r[17])
+                            };
+                            operations.push({ ref: db.collection(`${basePath}/officials`).doc(idCard), data });
+                        }
+                    } else { log('ไม่พบแผ่นงาน bookkon (ข้าม)', 'warn'); }
+
+                    // 2. score_logs
+                    const sScore = getSheet('score_logs');
+                    if (sScore) {
+                        log(`กำลังเตรียมข้อมูลประวัติคะแนน [${sScore}]...`);
+                        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sScore], { header: 1, defval: "" });
+                        for (let i = 1; i < rows.length; i++) {
+                            let r = rows[i];
+                            if (!r[2]) continue;
+                            let dateStr = cleanStr(r[1]);
+                            let data = {
+                                dateStr: dateStr,
+                                idCard: cleanStr(r[2]).replace(/\D/g, ''),
+                                fullName: cleanStr(r[3]),
+                                categoryId: cleanStr(r[4]),
+                                activityName: cleanStr(r[5]),
+                                activityDetail: cleanStr(r[6]),
+                                score: cleanNum(r[7]),
+                                type: cleanStr(r[8]),
+                                recordedBy: cleanStr(r[9]),
+                                proofUrl: cleanStr(r[10]),
+                                timestamp: dateStr ? firebase.firestore.Timestamp.fromDate(new Date(dateStr)) : firebase.firestore.FieldValue.serverTimestamp()
+                            };
+                            operations.push({ ref: db.collection(`${basePath}/score_logs`).doc(), data });
+                        }
+                    } else { log('ไม่พบแผ่นงาน score_logs (ข้าม)', 'warn'); }
+
+                    // 3. requests_appeals
+                    const sReq = getSheet('requests_appeals') || getSheet('request');
+                    if (sReq) {
+                        log(`กำลังเตรียมข้อมูลคำร้อง [${sReq}]...`);
+                        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sReq], { header: 1, defval: "" });
+                        for (let i = 1; i < rows.length; i++) {
+                            let r = rows[i];
+                            let reqId = cleanStr(r[0]);
+                            if (!reqId || !r[3]) continue;
+                            let dateStr = cleanStr(r[1]);
+                            let data = {
+                                dateStr: dateStr,
+                                type: cleanStr(r[2]),
+                                officialId: cleanStr(r[3]).replace(/\D/g, ''),
+                                fullName: cleanStr(r[4]),
+                                categoryId: cleanStr(r[5]),
+                                activityName: cleanStr(r[6]),
+                                detail: cleanStr(r[7]),
+                                reqScore: cleanNum(r[8]),
+                                fileUrl: cleanStr(r[9]),
+                                statTam: cleanStr(r[10]),
+                                statDist: cleanStr(r[11]),
+                                approvedScore: cleanNum(r[12]),
+                                refLogId: cleanStr(r[13]),
+                                timestamp: dateStr ? firebase.firestore.Timestamp.fromDate(new Date(dateStr)) : firebase.firestore.FieldValue.serverTimestamp()
+                            };
+                            operations.push({ ref: db.collection(`${basePath}/requests`).doc(reqId), data });
+                        }
+                    } else { log('ไม่พบแผ่นงาน requests_appeals (ข้าม)', 'warn'); }
+
+                    // 4. user_config
+                    const sUser = getSheet('user_config') || getSheet('config');
+                    if (sUser) {
+                        log(`กำลังเตรียมข้อมูลผู้ดูแลระบบ [${sUser}]...`);
+                        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sUser], { header: 1, defval: "" });
+                        for (let i = 1; i < rows.length; i++) {
+                            let r = rows[i];
+                            let username = cleanStr(r[0]);
+                            if (!username) continue;
+                            let data = {
+                                username: username,
+                                password: cleanStr(r[1]),
+                                role: cleanStr(r[2]),
+                                filter: cleanStr(r[3]),
+                                name: cleanStr(r[4])
+                            };
+                            operations.push({ ref: db.collection(`${basePath}/users_config`).doc(username), data });
+                        }
+                    } else { log('ไม่พบแผ่นงาน user_config (ข้าม)', 'warn'); }
+
+                    if (operations.length === 0) {
+                        throw new Error("ไม่พบข้อมูลในแผ่นงานใดๆ เลย กรุณาตรวจสอบไฟล์");
+                    }
+
+                    document.getElementById('progressText').innerText = `กำลังอัปโหลดเข้าเซิร์ฟเวอร์...`;
+                    document.getElementById('progressBar').style.width = `50%`;
+                    log(`=================================`, 'info');
+                    log(`เตรียมส่งข้อมูลจำนวน ${operations.length} รายการ ขึ้นฐานข้อมูล...`, 'success');
+                    
+                    await commitBatches(operations);
+
+                    document.getElementById('progressBar').style.width = `100%`;
+                    document.getElementById('progressText').innerText = `อัปโหลดสมบูรณ์!`;
+                    log(`🎉 นำเข้าข้อมูลทั้ง ${operations.length} รายการ เสร็จสมบูรณ์!`, 'success');
+                    
+                    btn.innerHTML = '<i class="fa-solid fa-check-circle"></i> นำเข้าข้อมูลสำเร็จ 100%';
+                    btn.classList.replace('bg-indigo-600', 'bg-emerald-600');
+                    btn.classList.replace('hover:bg-indigo-700', 'hover:bg-emerald-700');
+                    
+                    Swal.fire({
+                        title: 'ยอดเยี่ยม!',
+                        text: 'อัปโหลดฐานข้อมูลขึ้น Firebase เรียบร้อยแล้ว ตอนนี้ระบบ DOPA NASAN Score พร้อมใช้งานเต็มรูปแบบครับ!',
+                        icon: 'success',
+                        confirmButtonColor: '#4f46e5'
+                    }).then(() => {
+                        window.location.href = "index.html"; // กลับไปหน้าแรกทันที
+                    });
+
+                } catch (err) {
+                    log(`ข้อผิดพลาดการอ่านข้อมูล: ${err.message}`, 'error');
+                    btn.innerHTML = 'เกิดข้อผิดพลาด ลองใหม่อีกครั้ง';
+                    btn.classList.replace('bg-indigo-600', 'bg-red-600');
+                    btn.disabled = false;
+                }
+            };
+            reader.readAsArrayBuffer(file);
         }
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </body>
 </html>
 
