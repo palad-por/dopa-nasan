@@ -3,109 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Firebase Sheets - DOPA NASAN Score</title>
+    <title>Firebase Sheets V5 (Bookkon Schema) - DOPA NASAN</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, getDocs, doc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    <style>
-        body { font-family: 'Sarabun', sans-serif; background-color: #f8fafc; margin: 0; height: 100vh; display: flex; flex-direction: column; }
-        .sheet-table { border-collapse: collapse; width: 100%; background: white; }
-        .sheet-table th { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 8px; font-size: 12px; font-weight: bold; text-align: center; color: #475569; position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 2px rgba(0,0,0,0.05); white-space: nowrap; }
-        .sheet-table td { border: 1px solid #cbd5e1; padding: 0; position: relative; }
-        .sheet-input { width: 100%; height: 100%; min-height: 30px; border: none; padding: 4px 8px; font-size: 13px; outline: none; background: transparent; }
-        .sheet-input:focus { box-shadow: inset 0 0 0 2px #4f46e5; background: #eef2ff; }
-        .row-num { background: #f8fafc; text-align: center; font-size: 11px; color: #94a3b8; width: 40px; font-weight: bold; user-select: none; }
-        .custom-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
-        .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-    </style>
-</head>
-<body>
-
-    <!-- Header -->
-    <header class="bg-indigo-700 text-white p-3 flex justify-between items-center flex-none shadow-md z-20">
-        <div class="flex items-center gap-3">
-            <i class="fa-solid fa-table-cells text-2xl text-indigo-300"></i>
-            <div>
-                <h1 class="font-bold text-lg leading-tight">Firebase Sheets <span class="text-xs font-normal bg-indigo-800 px-2 py-0.5 rounded ml-2">DOPA NASAN Score</span></h1>
-                <p id="authStatus" class="text-[10px] text-indigo-200"><i class="fa-solid fa-circle-notch fa-spin"></i> กำลังเชื่อมต่อฐานข้อมูล...</p>
-            </div>
-        </div>
-        <div class="flex gap-2">
-            <button onclick="window.location.href='index.html'" class="bg-indigo-800 hover:bg-indigo-900 px-3 py-1.5 rounded-lg text-xs font-bold transition border border-indigo-600"><i class="fa-solid fa-house"></i> กลับหน้าหลัก</button>
-        </div>
-    </header>
-
-    <!-- Toolbar -->
-    <div class="bg-white border-b border-slate-200 p-2 flex gap-2 flex-none items-center shadow-sm z-10 overflow-x-auto">
-        <select id="tableSelector" onchange="switchTable()" class="bg-slate-50 border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2 font-bold outline-none cursor-pointer">
-            <option value="officials">👥 บุคลากร (bookkon)</option>
-            <option value="score_logs">⭐ ประวัติคะแนน (score_logs)</option>
-            <option value="requests">📝 คำร้องอุทธรณ์ (requests)</option>
-            <option value="users_config">⚙️ ผู้ดูแลระบบ (user_config)</option>
-        </select>
-        
-        <div class="h-6 w-px bg-slate-300 mx-1"></div>
-
-        <button onclick="fetchData()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1"><i class="fa-solid fa-rotate text-indigo-600"></i> โหลดข้อมูลเดิม</button>
-        <button onclick="addRow()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1"><i class="fa-solid fa-plus text-green-600"></i> เพิ่ม 1 แถว</button>
-        <button onclick="openPasteModal()" class="bg-amber-100 hover:bg-amber-200 text-amber-800 px-3 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1 border border-amber-200 shadow-sm"><i class="fa-solid fa-clipboard-list"></i> นำเข้าด่วนจาก Excel (Paste)</button>
-        
-        <div class="flex-grow"></div>
-        
-        <button onclick="clearCollection()" class="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1 border border-red-200"><i class="fa-solid fa-trash"></i> ล้างข้อมูลหน้านี้</button>
-        <button onclick="saveToFirebase()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 shadow-md active:scale-95"><i class="fa-solid fa-cloud-arrow-up"></i> บันทึกขึ้น Firebase</button>
-    </div>
-
-    <!-- Table Container -->
-    <main class="flex-grow overflow-auto bg-slate-100 custom-scroll relative" id="tableWrapper">
-        <table class="sheet-table" id="mainTable">
-            <thead id="tHead"></thead>
-            <tbody id="tBody"></tbody>
-        </table>
-    </main>
-    
-    <!-- Footer Status -->
-    <footer class="bg-slate-800 text-slate-300 p-1.5 text-[10px] flex justify-between flex-none">
-        <span id="recordCount">จำนวน: 0 แถว</span>
-        <span>ระบบจัดการฐานข้อมูลอัตโนมัติ (แก้ปัญหา Excel)</span>
-    </footer>
-
-    <!-- Paste Modal -->
-    <div id="pasteModal" class="hidden fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col h-[80vh]">
-            <div class="p-4 border-b flex justify-between items-center bg-amber-50 rounded-t-2xl">
-                <h3 class="font-bold text-amber-800"><i class="fa-solid fa-paste mr-2"></i>นำเข้าข้อมูลจาก Excel (Copy & Paste)</h3>
-                <button onclick="closePasteModal()" class="text-amber-800 hover:text-red-500"><i class="fa-solid fa-times text-xl"></i></button>
-            </div>
-            <div class="p-4 flex-grow flex flex-col">
-                <div class="text-xs text-slate-600 mb-2 p-3 bg-slate-50 border rounded-lg">
-                    <b>วิธีใช้งาน:</b><br>
-                    1. เปิดไฟล์ Excel ของคุณ ไปที่แผ่นงานที่ตรงกับตารางนี้<br>
-                    2. ใช้เมาส์คลุมดำข้อมูลทั้งหมด <b>(ไม่ต้องคลุมหัวข้อ เอาเฉพาะข้อมูล)</b> แล้วกด Copy (Ctrl+C)<br>
-                    3. นำมาคลิกที่กล่องด้านล่างนี้ แล้วกด Paste (Ctrl+V) จากนั้นกดปุ่มประมวลผล
-                </div>
-                <p class="text-xs font-bold text-indigo-600 mb-1" id="expectedColumnsLabel"></p>
-                <textarea id="pasteArea" class="flex-grow w-full border border-slate-300 rounded-xl p-3 text-xs font-mono outline-none focus:border-amber-400 bg-slate-50 whitespace-pre" wrap="off" placeholder="คลิกที่นี่แล้วกด Ctrl+V (วางข้อมูล)..."></textarea>
-            </div>
-            <div class="p-4 border-t bg-slate-50 rounded-b-2xl flex justify-end gap-2">
-                <button onclick="closePasteModal()" class="px-4 py-2 border rounded-lg text-sm font-bold text-slate-600">ยกเลิก</button>
-                <button onclick="processPaste()" class="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-bold shadow-md hover:bg-amber-600">ประมวลผลและนำลงตาราง</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Script -->
-    <script>
-        // --- 1. Firebase Setup ---
         const firebaseConfig = {
           apiKey: "AIzaSyBPC8Wcv5InhI9O-2aMfvclF3fBtqSo1xo",
           authDomain: "dopa-nasan-score.firebaseapp.com",
@@ -115,155 +23,102 @@
           appId: "1:678813152611:web:959239d16e296a16cc0f56",
           measurementId: "G-4QN247NQTT"
         };
-        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-        const auth = firebase.auth();
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
         const basePath = `artifacts/dopa-nasan-score/public/data`;
 
-        // --- 2. Schema (โครงสร้างแต่ละตาราง) ---
+        // โครงสร้างตรงกับฐานข้อมูลจริงทุกแผ่นงาน รวมถึง bookkon
         const schemas = {
             officials: {
                 docIdField: 'idCard',
                 cols: [
-                    { key: 'idCard', label: 'เลขบัตร ปชช. (ID)' },
+                    { key: 'idCard', label: 'เลขประจำตัวประชาชน' },
                     { key: 'fullName', label: 'ชื่อ-สกุล' },
                     { key: 'position', label: 'ตำแหน่ง' },
-                    { key: 'moo', label: 'หมู่ที่ (ตัวเลข)' },
-                    { key: 'rawVillage', label: 'ชื่อหมู่บ้าน' },
+                    { key: 'moo', label: 'หมู่ที่' },
+                    { key: 'rawVillage', label: 'ชื่อบ้าน' },
                     { key: 'subdistrict', label: 'ตำบล' },
-                    { key: 'totalScore', label: 'คะแนนรวมเดิม' }
+                    { key: 'totalScore', label: 'คะแนนรวม' }
                 ]
             },
             score_logs: {
-                docIdField: null, // ใช้ Auto ID
+                docIdField: null,
                 cols: [
-                    { key: 'dateStr', label: 'วันที่ (วว/ดด/ปปปป)' },
-                    { key: 'idCard', label: 'เลขบัตร ปชช.' },
-                    { key: 'fullName', label: 'ชื่อ-สกุล' },
-                    { key: 'categoryId', label: 'หมวดหมู่ (เช่น 1.1)' },
-                    { key: 'activityName', label: 'ชื่อกิจกรรม' },
-                    { key: 'activityDetail', label: 'รายละเอียด' },
-                    { key: 'score', label: 'คะแนน' },
-                    { key: 'type', label: 'ประเภท (positive/negative)' },
-                    { key: 'recordedBy', label: 'ผู้บันทึก' },
-                    { key: 'proofUrl', label: 'ลิงก์ไฟล์ (ถ้ามี)' }
+                    { key: 'Timestamp', label: 'Timestamp' },
+                    { key: 'Date', label: 'Date' },
+                    { key: 'ID_Card', label: 'ID_Card' },
+                    { key: 'FullName', label: 'FullName' },
+                    { key: 'Category', label: 'Category' },
+                    { key: 'ActivityName', label: 'ActivityName' },
+                    { key: 'ActivityDetail', label: 'ActivityDetail' },
+                    { key: 'Score', label: 'Score' },
+                    { key: 'Type', label: 'Type' },
+                    { key: 'RecordedBy', label: 'RecordedBy' },
+                    { key: 'ProofLink', label: 'ProofLink' }
                 ]
             },
-            requests: {
-                docIdField: 'reqId', // กรณีไม่มีให้สร้างออโต้
+            requests_appeals: {
+                docIdField: 'ReqID',
                 cols: [
-                    { key: 'reqId', label: 'รหัสคำร้อง (ID)' },
-                    { key: 'dateStr', label: 'วันที่' },
-                    { key: 'type', label: 'ประเภท (REQUEST/APPEAL)' },
-                    { key: 'officialId', label: 'เลขบัตร ปชช.' },
-                    { key: 'fullName', label: 'ชื่อ-สกุล' },
-                    { key: 'categoryId', label: 'หมวดหมู่' },
-                    { key: 'activityName', label: 'เรื่อง/ผลงาน' },
-                    { key: 'detail', label: 'รายละเอียด' },
-                    { key: 'reqScore', label: 'คะแนนที่ขอ' },
-                    { key: 'fileUrl', label: 'ลิงก์ไฟล์' },
-                    { key: 'statTam', label: 'สถานะตำบล' },
-                    { key: 'statDist', label: 'สถานะอำเภอ' },
-                    { key: 'approvedScore', label: 'คะแนนอนุมัติ' },
-                    { key: 'refLogId', label: 'อ้างอิง Log ID (อุทธรณ์)' }
+                    { key: 'ReqID', label: 'ReqID' },
+                    { key: 'Timestamp', label: 'Timestamp' },
+                    { key: 'Type', label: 'Type' },
+                    { key: 'ID_Card', label: 'ID_Card' },
+                    { key: 'FullName', label: 'FullName' },
+                    { key: 'Category', label: 'Category' },
+                    { key: 'ActivityName', label: 'ActivityName' },
+                    { key: 'ActivityDetail', label: 'ActivityDetail' },
+                    { key: 'RequestedScore', label: 'RequestedScore' },
+                    { key: 'ProofLink', label: 'ProofLink' },
+                    { key: 'StatusTambon', label: 'StatusTambon' },
+                    { key: 'StatusDistrict', label: 'StatusDistrict' }
                 ]
             },
-            users_config: {
-                docIdField: 'username',
+            user_config: {
+                docIdField: 'Username',
                 cols: [
-                    { key: 'username', label: 'Username (ID)' },
-                    { key: 'password', label: 'Password' },
-                    { key: 'role', label: 'สิทธิ์ (district/tambon)' },
-                    { key: 'filter', label: 'พื้นที่รับผิดชอบ (ตำบล)' },
-                    { key: 'name', label: 'ชื่อแสดงผล' }
+                    { key: 'Username', label: 'Username' },
+                    { key: 'Password', label: 'Password' },
+                    { key: 'Role', label: 'Role' },
+                    { key: 'Filter', label: 'Filter' },
+                    { key: 'Name', label: 'DisplayName' }
                 ]
             }
         };
 
         let currentTable = 'officials';
-        let tableData = []; // เก็บข้อมูลแถวของตารางปัจจุบัน
+        let tableData = [];
 
-        // --- 3. Initial Load ---
-        window.onload = () => {
-            auth.signInAnonymously().then(() => {
-                document.getElementById('authStatus').innerHTML = '<i class="fa-solid fa-check text-green-400"></i> เชื่อมต่อสำเร็จ';
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                await signInAnonymously(auth);
+                document.getElementById('authStatus').innerHTML = '<i class="fa-solid fa-check text-green-400"></i> เชื่อมต่อ Firebase สำเร็จ';
                 fetchData();
-            }).catch(err => {
-                document.getElementById('authStatus').innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-400"></i> ล็อกอินล้มเหลว: ${err.message}`;
-                Swal.fire('ข้อผิดพลาด', 'ต้องเปิดสิทธิ์ Anonymous ใน Firebase ก่อนครับ', 'error');
-            });
-        };
+            } catch (err) {
+                document.getElementById('authStatus').innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-400"></i> ล็อกอินล้มเหลว`;
+            }
+        });
 
-        function switchTable() {
+        window.switchTable = function() {
             currentTable = document.getElementById('tableSelector').value;
             fetchData();
         }
 
-        // --- 4. Render Table ---
-        function renderTable() {
-            const schema = schemas[currentTable];
-            const thead = document.getElementById('tHead');
-            const tbody = document.getElementById('tBody');
-            
-            // หัวตาราง
-            let thHtml = '<tr><th class="w-10">No.</th>';
-            schema.cols.forEach(c => { thHtml += `<th>${c.label}</th>`; });
-            thHtml += '<th class="w-10">ลบ</th></tr>';
-            thead.innerHTML = thHtml;
-
-            // ข้อมูล
-            let tbHtml = '';
-            tableData.forEach((row, rowIndex) => {
-                tbHtml += `<tr><td class="row-num">${rowIndex + 1}</td>`;
-                schema.cols.forEach(c => {
-                    let val = row[c.key] !== undefined ? row[c.key] : '';
-                    // ใช้ HTML input เพื่อให้แก้ได้เหมือน Excel
-                    tbHtml += `<td><input type="text" class="sheet-input" value="${val}" onchange="updateCell(${rowIndex}, '${c.key}', this.value)"></td>`;
-                });
-                tbHtml += `<td class="text-center bg-slate-50"><button onclick="deleteRow(${rowIndex})" class="text-red-400 hover:text-red-600 px-2 py-1" tabindex="-1"><i class="fa-solid fa-times"></i></button></td></tr>`;
-            });
-            tbody.innerHTML = tbHtml;
-            document.getElementById('recordCount').innerText = `จำนวน: ${tableData.length} แถว`;
-        }
-
-        function updateCell(rowIndex, key, value) {
-            tableData[rowIndex][key] = value;
-        }
-
-        function addRow() {
-            let newRow = {};
-            schemas[currentTable].cols.forEach(c => newRow[c.key] = '');
-            tableData.push(newRow);
-            renderTable();
-            // เลื่อนลงล่างสุด
-            document.getElementById('tableWrapper').scrollTop = document.getElementById('tableWrapper').scrollHeight;
-        }
-
-        function deleteRow(index) {
-            tableData.splice(index, 1);
-            renderTable();
-        }
-
-        // --- 5. Fetch Data from Firebase ---
-        async function fetchData() {
-            Swal.fire({ title: 'กำลังโหลดข้อมูล', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        window.fetchData = async function() {
+            Swal.fire({ title: 'กำลังโหลดข้อมูล...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
             tableData = [];
             try {
-                const snap = await db.collection(`${basePath}/${currentTable}`).get();
-                snap.forEach(doc => {
-                    let data = doc.data();
-                    // ถ้าตารางมี ID ออโต้แต่ในข้อมูลไม่มี ให้ดึง Doc ID มาโชว์ (สำหรับคำร้อง/Logs)
-                    if(schemas[currentTable].docIdField && !data[schemas[currentTable].docIdField]) {
-                        data[schemas[currentTable].docIdField] = doc.id;
+                const querySnapshot = await getDocs(collection(db, `${basePath}/${currentTable}`));
+                querySnapshot.forEach((document) => {
+                    let data = document.data();
+                    let schema = schemas[currentTable];
+                    if (schema.docIdField && !data[schema.docIdField]) {
+                        data[schema.docIdField] = document.id;
                     }
                     tableData.push(data);
                 });
-                
-                // จัดเรียง
-                if (currentTable === 'score_logs' || currentTable === 'requests') {
-                    tableData.sort((a,b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)); // ล่าสุดขึ้นก่อน
-                }
-                
                 renderTable();
                 Swal.close();
             } catch (err) {
@@ -271,20 +126,58 @@
             }
         }
 
-        // --- 6. Bulk Copy & Paste (สุดยอดฟีเจอร์) ---
-        function openPasteModal() {
+        window.renderTable = function() {
             const schema = schemas[currentTable];
-            const expectedCols = schema.cols.map(c => c.label).join(' | ');
-            document.getElementById('expectedColumnsLabel').innerText = `ลำดับคอลัมน์ที่ต้องก๊อปปี้มา: ${expectedCols}`;
+            const thead = document.getElementById('tHead');
+            const tbody = document.getElementById('tBody');
+            
+            let thHtml = '<tr><th class="w-10">No.</th>';
+            schema.cols.forEach(c => { thHtml += `<th>${c.label}</th>`; });
+            thHtml += '<th class="w-10">ลบ</th></tr>';
+            thead.innerHTML = thHtml;
+
+            let tbHtml = '';
+            tableData.forEach((row, rowIndex) => {
+                tbHtml += `<tr><td class="row-num">${rowIndex + 1}</td>`;
+                schema.cols.forEach(c => {
+                    let val = row[c.key] !== undefined ? row[c.key] : '';
+                    tbHtml += `<td><input type="text" class="sheet-input" value="${val}" onchange="updateCell(${rowIndex}, '${c.key}', this.value)"></td>`;
+                });
+                tbHtml += `<td class="text-center bg-slate-50"><button onclick="deleteRow(${rowIndex})" class="text-red-400 hover:text-red-600 px-2 py-1"><i class="fa-solid fa-times"></i></button></td></tr>`;
+            });
+            tbody.innerHTML = tbHtml;
+            document.getElementById('recordCount').innerText = `จำนวน: ${tableData.length} แถว`;
+        }
+
+        window.updateCell = function(rowIndex, key, value) {
+            tableData[rowIndex][key] = value;
+        }
+
+        window.addRow = function() {
+            let newRow = {};
+            schemas[currentTable].cols.forEach(c => newRow[c.key] = '');
+            tableData.push(newRow);
+            renderTable();
+            document.getElementById('tableWrapper').scrollTop = document.getElementById('tableWrapper').scrollHeight;
+        }
+
+        window.deleteRow = function(index) {
+            tableData.splice(index, 1);
+            renderTable();
+        }
+
+        window.openPasteModal = function() {
+            const schema = schemas[currentTable];
+            document.getElementById('expectedColumnsLabel').innerText = `ลำดับคอลัมน์ที่ต้องก๊อปปี้จาก Excel: ` + schema.cols.map(c => c.label).join(' | ');
             document.getElementById('pasteArea').value = '';
             document.getElementById('pasteModal').classList.remove('hidden');
         }
 
-        function closePasteModal() {
+        window.closePasteModal = function() {
             document.getElementById('pasteModal').classList.add('hidden');
         }
 
-        function processPaste() {
+        window.processPaste = function() {
             const text = document.getElementById('pasteArea').value;
             if (!text.trim()) { closePasteModal(); return; }
 
@@ -294,17 +187,12 @@
 
             rows.forEach(r => {
                 if (!r.trim()) return;
-                // ใน Excel เวลาก๊อปปี้มาวาง มันจะคั่นด้วย Tab (\t)
                 const cells = r.split('\t'); 
-                
                 let newObj = {};
                 schema.cols.forEach((col, index) => {
-                    // ลบเครื่องหมายคำพูดรอบๆ ถ้ามี
                     let val = (cells[index] || '').replace(/^"|"$/g, '').trim();
                     newObj[col.key] = val;
                 });
-                
-                // ตรวจสอบว่าไม่ได้ว่างเปล่าทั้งหมด
                 if (Object.values(newObj).some(v => v !== '')) {
                     tableData.push(newObj);
                     added++;
@@ -313,16 +201,15 @@
 
             renderTable();
             closePasteModal();
-            Swal.fire('สำเร็จ', `นำเข้าข้อมูลลงตารางสำเร็จ ${added} แถว (อย่าลืมกดบันทึกขึ้น Firebase)`, 'success');
+            Swal.fire('สำเร็จ', `นำเข้าข้อมูลลงตารางสำเร็จ ${added} แถว`, 'success');
         }
 
-        // --- 7. Save to Firebase (Batch processing) ---
-        async function saveToFirebase() {
+        window.saveToFirebase = async function() {
             if (tableData.length === 0) return Swal.fire('เตือน', 'ไม่มีข้อมูลให้บันทึก', 'warning');
 
             const result = await Swal.fire({
                 title: 'ยืนยันการบันทึก?',
-                text: `คุณกำลังจะบันทึกข้อมูล ${tableData.length} แถว ขึ้นฐานข้อมูล การกระทำนี้จะบันทึกทับข้อมูลเดิมทั้งหมดที่ตรงกับ ID!`,
+                text: `คุณกำลังจะบันทึกข้อมูลตาราง ${currentTable} จำนวน ${tableData.length} แถวขึ้น Firebase`,
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#10b981'
@@ -330,93 +217,108 @@
 
             if (!result.isConfirmed) return;
 
-            Swal.fire({ title: 'กำลังบันทึกข้อมูล...', html: '<b id="swalProgress">0%</b>', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            Swal.fire({ title: 'กำลังบันทึกข้อมูล...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
             const schema = schemas[currentTable];
-            let batches = [];
-            let currentBatch = db.batch();
-            let count = 0;
-            let successCount = 0;
-
-            for (let i = 0; i < tableData.length; i++) {
-                let row = tableData[i];
-                let docId = null;
-
-                // ตรวจสอบว่าต้องใช้ ID จากคอลัมน์ไหน
-                if (schema.docIdField) {
-                    docId = row[schema.docIdField];
-                    if (!docId) { // ถ้าไม่มีให้สร้างใหม่
-                        if(currentTable === 'requests') docId = 'REQ-' + Date.now() + i;
-                        else docId = 'ID-' + Date.now() + i;
-                        row[schema.docIdField] = docId;
-                    }
-                }
-
-                const ref = docId ? db.collection(`${basePath}/${currentTable}`).doc(String(docId)) : db.collection(`${basePath}/${currentTable}`).doc();
-
-                // ปรับแต่งข้อมูลก่อนบันทึก (แปลงตัวเลข, ใส่วันที่)
-                let finalData = { ...row };
-                
-                if (currentTable === 'officials') {
-                    finalData.totalScore = parseFloat(row.totalScore) || 0;
-                    if(row.moo && row.rawVillage && !row.village) finalData.village = `หมู่ที่ ${row.moo} ${row.rawVillage}`;
-                }
-                if (currentTable === 'score_logs' || currentTable === 'requests') {
-                    finalData.score = parseFloat(row.score) || 0;
-                    finalData.reqScore = parseFloat(row.reqScore) || 0;
-                    finalData.approvedScore = parseFloat(row.approvedScore) || 0;
-                    // จัดการ Timestamp
-                    if (!finalData.timestamp) {
-                        finalData.timestamp = firebase.firestore.FieldValue.serverTimestamp();
-                    }
-                }
-
-                currentBatch.set(ref, finalData);
-                count++;
-                successCount++;
-
-                if (count === 400) {
-                    batches.push(currentBatch);
-                    currentBatch = db.batch();
-                    count = 0;
-                }
-                
-                if(i % 10 === 0) {
-                    const prog = document.getElementById('swalProgress');
-                    if (prog) prog.innerText = `${Math.round((i/tableData.length)*100)}%`;
-                }
-            }
-
-            if (count > 0) batches.push(currentBatch);
-
             try {
-                for (let i = 0; i < batches.length; i++) {
-                    await batches[i].commit();
-                }
-                
-                renderTable(); // วาดตารางใหม่พร้อมอัปเดต ID
-                Swal.fire('สำเร็จ', `บันทึกข้อมูล ${successCount} แถวเรียบร้อยแล้ว`, 'success');
+                const batch = writeBatch(db);
+                tableData.forEach((row, i) => {
+                    let docId = schema.docIdField ? row[schema.docIdField] : null;
+                    if (!docId) docId = 'ID-' + Date.now() + '-' + i;
+                    
+                    const ref = doc(db, `${basePath}/${currentTable}`, String(docId));
+                    let finalData = { ...row };
+                    
+                    if (currentTable === 'officials') {
+                        finalData.totalScore = parseFloat(row.totalScore) || 0;
+                        // สร้างฟิลด์ช่วยเสริมความเข้ากันได้กับหน้าเว็บหลัก
+                        let cleanId = String(row.idCard || '').replace(/\D/g, '');
+                        finalData.idCard = cleanId;
+                        if(row.moo && row.rawVillage && !row.village) {
+                            finalData.village = `หมู่ที่ ${row.moo} ${row.rawVillage}`;
+                        }
+                    }
+
+                    batch.set(ref, finalData);
+                });
+
+                await batch.commit();
+                Swal.fire('สำเร็จ', 'บันทึกข้อมูลขึ้น Firebase เรียบร้อยแล้ว', 'success');
+                fetchData();
             } catch (err) {
                 Swal.fire('เกิดข้อผิดพลาด', err.message, 'error');
             }
         }
-
-        // --- 8. Clear Collection (ตัวเลือกเสริม) ---
-        function clearCollection() {
-            Swal.fire({
-                title: 'แน่ใจหรือไม่?',
-                text: `คุณกำลังจะลบข้อมูล "ทั้งหมด" ในตาราง ${currentTable} บนหน้าจอนี้ (ข้อมูลใน Firebase ยังไม่หายจนกว่าจะกดเซฟทับ)`,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    tableData = [];
-                    renderTable();
-                }
-            });
-        }
     </script>
+
+    <style>
+        body { font-family: 'Sarabun', sans-serif; background-color: #f8fafc; margin: 0; height: 100vh; display: flex; flex-direction: column; }
+        .sheet-table { border-collapse: collapse; width: 100%; background: white; }
+        .sheet-table th { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 8px; font-size: 12px; font-weight: bold; text-align: center; color: #475569; position: sticky; top: 0; z-index: 10; }
+        .sheet-table td { border: 1px solid #cbd5e1; padding: 0; position: relative; }
+        .sheet-input { width: 100%; height: 100%; min-height: 30px; border: none; padding: 4px 8px; font-size: 13px; outline: none; background: transparent; }
+        .sheet-input:focus { box-shadow: inset 0 0 0 2px #4f46e5; background: #eef2ff; }
+        .row-num { background: #f8fafc; text-align: center; font-size: 11px; color: #94a3b8; width: 40px; font-weight: bold; user-select: none; }
+        .custom-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <header class="bg-indigo-700 text-white p-3 flex justify-between items-center flex-none shadow-md">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid fa-table-cells text-2xl text-indigo-300"></i>
+            <div>
+                <h1 class="font-bold text-lg leading-tight">Firebase Sheets V5 (Bookkon Exact)</h1>
+                <p id="authStatus" class="text-[10px] text-indigo-200">กำลังเชื่อมต่อ...</p>
+            </div>
+        </div>
+        <button onclick="window.location.href='index.html'" class="bg-indigo-800 px-3 py-1.5 rounded-lg text-xs font-bold"><i class="fa-solid fa-house"></i> หน้าหลัก</button>
+    </header>
+
+    <div class="bg-white border-b border-slate-200 p-2 flex gap-2 flex-none items-center shadow-sm overflow-x-auto">
+        <select id="tableSelector" onchange="switchTable()" class="bg-slate-50 border border-slate-300 text-sm rounded-lg p-2 font-bold outline-none cursor-pointer">
+            <option value="officials">👥 บุคลากร (bookkon)</option>
+            <option value="score_logs">⭐ ประวัติคะแนน (score_logs)</option>
+            <option value="requests_appeals">📝 คำร้องอุทธรณ์ (requests_appeals)</option>
+            <option value="user_config">⚙️ ผู้ดูแลระบบ (user_config)</option>
+        </select>
+        <button onclick="fetchData()" class="bg-slate-100 px-3 py-2 rounded-lg text-xs font-bold"><i class="fa-solid fa-rotate"></i> โหลด</button>
+        <button onclick="addRow()" class="bg-slate-100 px-3 py-2 rounded-lg text-xs font-bold"><i class="fa-solid fa-plus text-green-600"></i> เพิ่มแถว</button>
+        <button onclick="openPasteModal()" class="bg-amber-100 text-amber-800 px-3 py-2 rounded-lg text-xs font-bold border"><i class="fa-solid fa-clipboard-list"></i> วางข้อมูลด่วนจาก Excel (Paste)</button>
+        <div class="flex-grow"></div>
+        <button onclick="saveToFirebase()" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md"><i class="fa-solid fa-cloud-arrow-up"></i> บันทึกขึ้น Firebase</button>
+    </div>
+
+    <main class="flex-grow overflow-auto bg-slate-100 custom-scroll relative" id="tableWrapper">
+        <table class="sheet-table" id="mainTable">
+            <thead id="tHead"></thead>
+            <tbody id="tBody"></tbody>
+        </table>
+    </main>
+
+    <footer class="bg-slate-800 text-slate-300 p-1.5 text-[10px] flex justify-between flex-none">
+        <span id="recordCount">จำนวน: 0 แถว</span>
+    </footer>
+
+    <div id="pasteModal" class="hidden fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col h-[80vh]">
+            <div class="p-4 border-b flex justify-between bg-amber-50 rounded-t-2xl">
+                <h3 class="font-bold text-amber-800">วางข้อมูลจาก Excel</h3>
+                <button onclick="closePasteModal()"><i class="fa-solid fa-times text-xl"></i></button>
+            </div>
+            <div class="p-4 flex-grow flex flex-col">
+                <p class="text-xs font-bold text-indigo-600 mb-1" id="expectedColumnsLabel"></p>
+                <textarea id="pasteArea" class="flex-grow w-full border rounded-xl p-3 text-xs font-mono outline-none bg-slate-50" placeholder="คลิกที่นี่แล้วกด Ctrl+V วางข้อมูล..."></textarea>
+            </div>
+            <div class="p-4 border-t bg-slate-50 rounded-b-2xl flex justify-end gap-2">
+                <button onclick="closePasteModal()" class="px-4 py-2 border rounded-lg text-sm font-bold">ยกเลิก</button>
+                <button onclick="processPaste()" class="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-bold">นำลงตาราง</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </body>
 </html>
 
