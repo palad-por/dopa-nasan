@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Firebase Sheets V11 - Exact Fields</title>
+    <title>Firebase Sheets V12 - Users Config Fixed</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -30,14 +30,14 @@
         const basePath = `artifacts/dopa-nasan-score/public/data`;
 
         const schemas = {
-            user_config: {
-                docIdField: 'Username',
+            users_config: {
+                docIdField: 'username',
                 cols: [
-                    { key: 'Username', label: 'Username' },
-                    { key: 'Password', label: 'Password' },
-                    { key: 'Role', label: 'Role' },
-                    { key: 'Filter', label: 'Filter' },
-                    { key: 'DisplayName', label: 'DisplayName' }
+                    { key: 'username', label: 'username' },
+                    { key: 'password', label: 'password' },
+                    { key: 'role', label: 'role' },
+                    { key: 'filter', label: 'filter' },
+                    { key: 'name', label: 'name' }
                 ]
             },
             officials: {
@@ -82,7 +82,7 @@
             }
         };
 
-        let currentTable = 'user_config';
+        let currentTable = 'users_config';
         let tableData = [];
 
         window.addEventListener('DOMContentLoaded', async () => {
@@ -108,17 +108,14 @@
                 querySnapshot.forEach((document) => {
                     let data = document.data();
                     let schema = schemas[currentTable];
-                    let rowObj = {};
-                    
-                    // ดึงค่าตาม Schema โดยตรงหรือดึงแบบยืดหยุ่นถ้าข้อมูลเก่ามีรูปแบบต่างกัน
-                    schema.cols.forEach(c => {
-                        rowObj[c.key] = data[c.key] !== undefined ? data[c.key] : (data[c.key.toLowerCase()] !== undefined ? data[c.key.toLowerCase()] : '');
-                    });
-
-                    if (schema.docIdField && !rowObj[schema.docIdField]) {
-                        rowObj[schema.docIdField] = document.id;
+                    let normalized = {};
+                    for (let k in data) {
+                        normalized[k.toLowerCase()] = data[k];
                     }
-                    tableData.push(rowObj);
+                    if (schema.docIdField && !normalized[schema.docIdField]) {
+                        normalized[schema.docIdField] = document.id;
+                    }
+                    tableData.push(normalized);
                 });
                 renderTable();
                 Swal.close();
@@ -266,7 +263,7 @@
         <div class="flex items-center gap-3">
             <i class="fa-solid fa-table-cells text-2xl text-indigo-300"></i>
             <div>
-                <h1 class="font-bold text-lg leading-tight">Firebase Sheets V11 (Exact Fields)</h1>
+                <h1 class="font-bold text-lg leading-tight">Firebase Sheets V12 (Users Config)</h1>
                 <p id="authStatus" class="text-[10px] text-indigo-200">กำลังเชื่อมต่อ...</p>
             </div>
         </div>
@@ -275,7 +272,7 @@
 
     <div class="bg-white border-b border-slate-200 p-2 flex gap-2 flex-none items-center shadow-sm overflow-x-auto">
         <select id="tableSelector" onchange="switchTable()" class="bg-slate-50 border border-slate-300 text-sm rounded-lg p-2 font-bold outline-none cursor-pointer">
-            <option value="user_config">⚙️ ผู้ดูแลระบบ (user_config)</option>
+            <option value="users_config">⚙️ ผู้ดูแลระบบ (users_config)</option>
             <option value="officials">👥 บุคลากร (officials)</option>
             <option value="score_logs">⭐ ประวัติคะแนน (score_logs)</option>
             <option value="requests_appeals">📝 คำร้องอุทธรณ์ (requests_appeals)</option>
