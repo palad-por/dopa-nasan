@@ -145,18 +145,32 @@
         const appId = 'dopa-nasan-score';
         const basePath = `artifacts/${appId}/public/data`;
 
-        let allData = [];
-        let authReady = false; // ตัวแปรสำหรับตรวจสอบว่าล็อกอินเสร็จหรือยัง
+        const CRITERIA_LIST = [
+          { id: '1.1.1', name: '1.1.1 งานตาม พ.ร.บ.ฯ' },
+          { id: '1.1.2', name: '1.1.2 กฎหมายอื่น' },
+          { id: '1.2', name: '1.2 ภารกิจยุทธศาสตร์' },
+          { id: '1.3', name: '1.3 ภารกิจพื้นที่' },
+          { id: '1.4', name: '1.4 รางวัล/เสี่ยงภัย' },
+          { id: '2.1', name: '2.1 การวางแผน' },
+          { id: '2.2', name: '2.2 ความเป็นผู้นำ' },
+          { id: '2.3', name: '2.3 ความรับผิดชอบ' },
+          { id: '2.4', name: '2.4 ความสามารถ' },
+          { id: '2.5', name: '2.5 ความอุตสาหะ' },
+          { id: '2.6', name: '2.6 การรักษาวินัย' },
+          { id: '2.7', name: '2.7 จรรยาบรรณ' }
+        ];
+        const CRITERIA = {}; CRITERIA_LIST.forEach(c => CRITERIA[c.id] = c);
 
-        // ตรวจสอบการเปลี่ยนแปลงสถานะ Authentication (แก้ปัญหาข้อมูลไม่แสดงอัตโนมัติ)
+        let allData = [];
+        let authReady = false; 
+
         auth.onAuthStateChanged((user) => {
             if (user) {
                 authReady = true;
-                fetchData(); // ดึงข้อมูลทันทีเมื่อพร้อม
+                fetchData(); 
             }
         });
 
-        // ล็อกอินแบบไม่ระบุตัวตน (เรียกใช้ครั้งเดียวตอนเปิดหน้าเว็บ)
         document.addEventListener('DOMContentLoaded', () => {
             auth.signInAnonymously().catch((error) => {
                 console.error("Authentication Error:", error);
@@ -170,7 +184,7 @@
         }
 
         function fetchData() {
-            if (!authReady) return; // ป้องกันการดึงข้อมูลก่อนล็อกอินเสร็จ
+            if (!authReady) return;
 
             document.getElementById('lastUpdate').innerText = "กำลังอัปเดต...";
             
@@ -312,32 +326,68 @@
                     let logsArr = [];
                     snap.docs.forEach(doc => logsArr.push(doc.data()));
                     
-                    // เรียงลำดับตามวันที่ทำกิจกรรม ล่าสุดอยู่บนสุด
-                    logsArr.sort((a, b) => {
-                        let dateA = parseDateForSort(a.dateStr, a.timestamp);
-                        let dateB = parseDateForSort(b.dateStr, b.timestamp);
-                        return dateB - dateA;
-                    });
+                    // จัดกลุ่มคะแนนตามวันที่และชื่อกิจกรรม (ก้อนคะแนนที่ถูกกระจาย)
+                    let grouped = {};
+                    let order = [];
                     
                     logsArr.forEach(l => {
+                        let sortTime = parseDateForSort(l.dateStr, l.timestamp);
+                        let key = sortTime + '_' + l.activityName;
+                        let rawSc = Number(l.score) || 0;
+                        let actualScore = l.type === 'negative' ? -Math.abs(rawSc) : Math.abs(rawSc);
+                        let catName = CRITERIA[l.categoryId] ? CRITERIA[l.categoryId].name : l.categoryId;
+                        
+                        if (!grouped[key]) {
+                            grouped[key] = {
+                                sortTime: sortTime,
+                                dateStr: l.dateStr,
+                                timestamp: l.timestamp,
+                                activityName: l.activityName, 
+                                activityDetail: l.activityDetail || '',
+                                rawScore: actualScore, 
+                                proof: l.proofUrl || l.ProofLink || '',
+                                breakdowns: [{ name: catName, score: actualScore }]
+                            };
+                            order.push(key);
+                        } else {
+                            grouped[key].rawScore += actualScore;
+                            grouped[key].breakdowns.push({ name: catName, score: actualScore });
+                        }
+                    });
+
+                    let finalHistory = order.map(k => grouped[k]);
+                    
+                    // เรียงลำดับจากล่าสุดอยู่บนสุด
+                    finalHistory.sort((a, b) => b.sortTime - a.sortTime);
+                    
+                    finalHistory.forEach(l => {
                         let dateDisplay = formatThaiDate(l.dateStr, l.timestamp);
-                        let scoreDisplay = (l.type === 'negative' ? '-' : '+') + Math.abs(l.score);
-                        let scoreHtml = `<span class="${l.type==='positive'?'text-green-600':'text-red-600'}">${scoreDisplay}</span>`;
+                        let isNegative = l.rawScore < 0;
+                        let scoreDisplay = (isNegative ? '' : '+') + l.rawScore;
+                        let scoreHtml = `<span class="${!isNegative ? 'text-green-600' : 'text-red-600'}">${scoreDisplay}</span>`;
+                        
+                        // แถบ Breakdown (ก้อนคะแนน)
+                        let breakdownHtml = l.breakdowns.map(b => 
+                            `<span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[10px] mr-1 mt-1 border border-indigo-100 inline-block">${b.name} (${b.score > 0 ? '+' : ''}${b.score})</span>`
+                        ).join('');
                         
                         // สร้างปุ่มหลักฐาน (แสดง "-" สีเทาๆ ถ้าไม่มีหลักฐาน)
-                        let proof = l.proofUrl ? `<a href="${l.proofUrl}" target="_blank" class="text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-600 hover:text-white transition whitespace-nowrap inline-flex items-center justify-center gap-1 w-full md:w-auto"><i class="fa-solid fa-paperclip"></i> ดูไฟล์</a>` : '<span class="text-slate-300">-</span>';
+                        let proofLink = l.proof ? l.proof : '';
+                        let proofBtnDesktop = proofLink ? `<a href="${proofLink}" target="_blank" class="text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-600 hover:text-white transition whitespace-nowrap inline-flex items-center justify-center gap-1 w-full"><i class="fa-solid fa-paperclip"></i> ดูไฟล์</a>` : '<span class="text-slate-300">-</span>';
+                        let proofBtnMobile = proofLink ? `<a href="${proofLink}" target="_blank" class="text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-600 hover:text-white transition whitespace-nowrap inline-flex items-center justify-center gap-1 w-fit mt-2"><i class="fa-solid fa-paperclip"></i> ดูไฟล์หลักฐาน</a>` : '';
                         
                         tb.innerHTML += `<tr class="hover:bg-slate-50 transition border-b border-slate-50">
                             <td class="p-3 md:p-4 text-[10px] md:text-xs text-slate-500 font-mono align-top pt-4 md:pt-5">${dateDisplay}</td>
                             <td class="p-3 md:p-4 text-sm align-top">
                                 <div class="text-slate-800 font-medium leading-relaxed">${l.activityName}</div>
-                                <div class="text-xs text-slate-500 mt-1 whitespace-pre-wrap">${l.activityDetail || ''}</div>
+                                <div class="mb-1.5">${breakdownHtml}</div>
+                                <div class="text-xs text-slate-500 mt-1 whitespace-pre-wrap">${l.activityDetail}</div>
                                 <!-- แสดงปุ่มหลักฐานใต้ชื่อกิจกรรมเฉพาะบนมือถือ -->
-                                <div class="mt-3 block md:hidden w-fit">${proof}</div>
+                                <div class="block md:hidden">${proofBtnMobile}</div>
                             </td>
                             <td class="p-3 md:p-4 text-center font-bold text-lg md:text-xl align-top pt-4 md:pt-5">${scoreHtml}</td>
-                            <!-- ซ่อนคอลัมน์หลักฐานบนมือถือ (เพราะย้ายไปไว้ใต้ชื่อกิจกรรมแล้ว) -->
-                            <td class="p-4 text-center align-top pt-5 hidden md:table-cell">${proof}</td>
+                            <!-- คอลัมน์หลักฐาน (ซ่อนบนมือถือ) -->
+                            <td class="p-4 text-center align-top pt-5 hidden md:table-cell">${proofBtnDesktop}</td>
                         </tr>`;
                     });
                 })
