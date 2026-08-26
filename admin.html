@@ -226,7 +226,7 @@
             <div class="flex-grow overflow-auto p-4 custom-scroll relative bg-slate-50">
                 <div class="overflow-x-auto bg-white rounded-xl shadow-sm border border-slate-200">
                     <table class="w-full text-left min-w-[600px]">
-                        <thead class="bg-slate-50 text-slate-500 text-xs uppercase border-b"><tr><th class="p-4 w-24">วันที่</th><th class="p-4">หมวดและรายละเอียดกิจกรรม</th><th class="p-4 text-right w-20">คะแนน</th><th class="p-4 text-center w-28">จัดการ/หลักฐาน</th></tr></thead>
+                        <thead class="bg-slate-50 text-slate-500 text-xs uppercase border-b"><tr><th class="p-4 w-24">วันที่</th><th class="p-4">หมวดและรายละเอียดกิจกรรม</th><th class="p-4 text-right w-20">คะแนน</th><th class="p-4 text-center w-28 hidden md:table-cell">จัดการ/หลักฐาน</th></tr></thead>
                         <tbody id="histBody" class="divide-y divide-slate-100 text-sm"></tbody>
                     </table>
                 </div>
@@ -423,8 +423,18 @@
                 let foundAdmin = null;
                 usersSnap.forEach(doc => {
                     let d = doc.data();
-                    if(d.username.toLowerCase() === u && d.password === p) {
-                        foundAdmin = { username: d.username, role: d.role, filter: d.filter, name: d.name || d.displayName, docId: doc.id };
+                    let storedUser = (d.username || d.Username || '').toLowerCase();
+                    let storedPass = (d.password || d.Password || '');
+                    
+                    // บังคับแปลงเป็น String ก่อนเทียบ ป้องกันบัก Number จาก Excel
+                    if(String(storedUser) === String(u) && String(storedPass) === String(p)) {
+                        foundAdmin = { 
+                            username: d.username || d.Username, 
+                            role: (d.role || d.Role || 'tambon').toLowerCase(), 
+                            filter: d.filter || d.Filter, 
+                            name: d.name || d.DisplayName || d.displayName, 
+                            docId: doc.id 
+                        };
                     }
                 });
 
@@ -797,6 +807,22 @@
             manageHistory(curUser.username, curUser.name);
         }
 
+        // ฟังก์ชันแปลงวันที่ให้เป็นแบบไทย DD/MM/YYYY
+        function formatThaiDate(dStr) {
+            if (!dStr) return "-";
+            try {
+                let d = new Date(dStr);
+                if (isNaN(d.getTime())) return dStr;
+                let day = String(d.getDate()).padStart(2, '0');
+                let month = String(d.getMonth() + 1).padStart(2, '0');
+                let year = d.getFullYear();
+                if (year < 2500) year += 543;
+                return `${day}/${month}/${year}`;
+            } catch(e) {
+                return dStr;
+            }
+        }
+
         async function manageHistory(idCard, name) {
             document.getElementById('histTitle').innerText = `ประวัติ: ${name}`;
             openModal('histModal'); 
@@ -804,7 +830,6 @@
             tb.innerHTML='<tr><td colspan="4" class="text-center p-8"><i class="fa-solid fa-spinner fa-spin text-indigo-500 text-2xl"></i></td></tr>';
             
             try {
-                // ดึงข้อมูลการอุทธรณ์เพื่อเช็คสถานะว่าเคยอุทธรณ์รึยัง
                 const reqSnap = await db.collection(`${basePath}/requests`).where('officialId', '==', idCard).where('type', '==', 'APPEAL').get();
                 const appealedLogIds = new Set();
                 reqSnap.forEach(doc => {
@@ -812,62 +837,63 @@
                     if(r.refLogId) appealedLogIds.add(r.refLogId);
                 });
 
-                const logsSnap = await db.collection(`${basePath}/score_logs`).where('idCard', '==', idCard).orderBy('timestamp', 'desc').get();
+                const logsSnap = await db.collection(`${basePath}/score_logs`).where('idCard', '==', idCard).get();
                 tb.innerHTML = '';
                 
                 if(logsSnap.empty) { tb.innerHTML='<tr><td colspan="4" class="text-center p-6 text-slate-400">ไม่มีประวัติ</td></tr>'; return; }
                 
-                logsSnap.forEach(doc => {
-                    let l = doc.data();
-                    let logId = doc.id;
-                    
-                    // ปรับปรุงการตรวจสอบและการดึงค่าวันที่
-                    let dateStr = "-";
-                    if (l.timestamp) {
-                        if (typeof l.timestamp.toDate === 'function') {
-                            dateStr = new Date(l.timestamp.toDate()).toLocaleDateString('th-TH');
-                        } else if (l.timestamp.seconds) {
-                            dateStr = new Date(l.timestamp.seconds * 1000).toLocaleDateString('th-TH');
-                        } else {
-                            let d = new Date(l.timestamp);
-                            if (!isNaN(d.getTime())) dateStr = d.toLocaleDateString('th-TH');
-                            else dateStr = l.dateStr || "-";
-                        }
-                    } else if (l.dateStr) {
-                         dateStr = l.dateStr;
-                    }
-                    
+                // นำข้อมูลมาเรียงลำดับวันที่ ล่าสุดอยู่บน
+                let logsArr = [];
+                logsSnap.docs.forEach(doc => logsArr.push({id: doc.id, ...doc.data()}));
+                logsArr.sort((a, b) => {
+                    let dateA = new Date(a.dateStr || a.timestamp || 0);
+                    let dateB = new Date(b.dateStr || b.timestamp || 0);
+                    return dateB - dateA;
+                });
+                
+                logsArr.forEach(l => {
+                    let logId = l.id;
+                    let dateStr = formatThaiDate(l.dateStr || l.timestamp);
                     let catName = CRITERIA[l.categoryId] ? CRITERIA[l.categoryId].name : l.categoryId;
                     let scoreDisplay = (l.type === 'negative' ? '-' : '+') + Math.abs(l.score);
                     
-                    let proof = l.proofUrl ? `<a href="${l.proofUrl}" target="_blank" class="text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-100 whitespace-nowrap inline-flex items-center"><i class="fa-solid fa-paperclip mr-1"></i> ดูไฟล์</a>` : '-';
-                    let action = proof;
+                    let proof = l.proofUrl ? `<a href="${l.proofUrl}" target="_blank" class="text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-100 whitespace-nowrap inline-flex items-center w-full md:w-auto justify-center"><i class="fa-solid fa-paperclip mr-1"></i> ดูไฟล์</a>` : '<span class="text-slate-300">-</span>';
+                    
+                    let actionDesktop = proof;
+                    let actionMobile = proof;
                     
                     if(curUser.role==='user' && l.type==='negative') {
                         if (appealedLogIds.has(logId)) {
-                            action += `<div class="mt-2 text-[10px] bg-slate-100 text-slate-500 px-3 py-1.5 rounded-lg font-bold w-full text-center border border-slate-200">ยื่นอุทธรณ์แล้ว</div>`;
+                            let apBtn = `<div class="mt-2 text-[10px] bg-slate-100 text-slate-500 px-3 py-1.5 rounded-lg font-bold w-full text-center border border-slate-200">ยื่นอุทธรณ์แล้ว</div>`;
+                            actionDesktop += apBtn; actionMobile += apBtn;
                         } else {
-                            action += `<button onclick="openAppeal('${l.categoryId}', '${l.activityName}', ${l.score}, '${logId}')" class="mt-2 text-[10px] bg-orange-500 text-white px-3 py-1.5 rounded-lg font-bold w-full shadow-sm hover:bg-orange-600">ยื่นอุทธรณ์</button>`;
+                            let apBtn = `<button onclick="openAppeal('${l.categoryId}', '${l.activityName}', ${l.score}, '${logId}')" class="mt-2 text-[10px] bg-orange-500 text-white px-3 py-1.5 rounded-lg font-bold w-full shadow-sm hover:bg-orange-600">ยื่นอุทธรณ์</button>`;
+                            actionDesktop += apBtn; actionMobile += apBtn;
                         }
                     } else if (curUser.role === 'district') {
-                        action += `<div class="flex gap-2 mt-2 justify-center">
+                        let admBtns = `<div class="flex gap-2 mt-2 justify-center">
                             <button onclick="openEditLog('${logId}', '${idCard}', '${l.categoryId}', '${l.activityName}', '${l.activityDetail || ''}', ${l.score})" class="bg-amber-100 text-amber-600 p-2 rounded-lg hover:bg-amber-200"><i class="fa-solid fa-pen text-[10px]"></i></button>
                             <button onclick="deleteLog('${logId}', '${idCard}')" class="bg-red-100 text-red-600 p-2 rounded-lg hover:bg-red-200"><i class="fa-solid fa-trash text-[10px]"></i></button>
                         </div>`;
+                        actionDesktop += admBtns; actionMobile += admBtns;
                     }
                     
                     let scoreHtml = `<span class="${l.type==='positive'?'text-green-600':'text-red-600'}">${scoreDisplay}</span>`;
 
                     tb.innerHTML += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition">
-                        <td class="p-4 text-xs text-slate-500 font-mono align-top pt-5">${dateStr}</td>
-                        <td class="p-4 text-sm align-top">
+                        <td class="p-3 md:p-4 text-[10px] md:text-xs text-slate-500 font-mono align-top pt-4 md:pt-5">${dateStr}</td>
+                        <td class="p-3 md:p-4 text-sm align-top">
                             <div class="text-slate-800 font-bold">${l.activityName}</div>
                             <div class="mb-1.5"><span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[10px] border border-indigo-100">${catName}</span></div>
                             <div class="text-xs text-slate-600 mt-1 whitespace-pre-wrap">${l.activityDetail || ''}</div>
                             <div class="text-[10px] text-slate-400 mt-2"><i class="fa-solid fa-user-pen"></i> ผู้บันทึก: ${l.recordedBy || '-'}</div>
+                            
+                            <!-- ปุ่ม Action บนมือถือจะมาอยู่ใต้ชื่อกิจกรรม -->
+                            <div class="mt-3 block md:hidden w-fit">${actionMobile}</div>
                         </td>
-                        <td class="p-4 text-right font-bold text-xl align-top pt-5">${scoreHtml}</td>
-                        <td class="p-4 text-center align-top pt-5">${action}</td>
+                        <td class="p-3 md:p-4 text-right font-bold text-lg md:text-xl align-top pt-4 md:pt-5">${scoreHtml}</td>
+                        <!-- คอลัมน์จัดการ ซ่อนบนมือถือ -->
+                        <td class="p-4 text-center align-top pt-5 hidden md:table-cell">${actionDesktop}</td>
                     </tr>`;
                 });
             } catch (err) {
