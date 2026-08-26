@@ -820,8 +820,22 @@
                 logsSnap.forEach(doc => {
                     let l = doc.data();
                     let logId = doc.id;
-                    let dateStr = l.timestamp ? new Date(l.timestamp.toDate()).toLocaleDateString('th-TH') : l.dateStr;
-                    if (!dateStr) dateStr = "-";
+                    
+                    // ปรับปรุงการตรวจสอบและการดึงค่าวันที่
+                    let dateStr = "-";
+                    if (l.timestamp) {
+                        if (typeof l.timestamp.toDate === 'function') {
+                            dateStr = new Date(l.timestamp.toDate()).toLocaleDateString('th-TH');
+                        } else if (l.timestamp.seconds) {
+                            dateStr = new Date(l.timestamp.seconds * 1000).toLocaleDateString('th-TH');
+                        } else {
+                            let d = new Date(l.timestamp);
+                            if (!isNaN(d.getTime())) dateStr = d.toLocaleDateString('th-TH');
+                            else dateStr = l.dateStr || "-";
+                        }
+                    } else if (l.dateStr) {
+                         dateStr = l.dateStr;
+                    }
                     
                     let catName = CRITERIA[l.categoryId] ? CRITERIA[l.categoryId].name : l.categoryId;
                     let scoreDisplay = (l.type === 'negative' ? '-' : '+') + Math.abs(l.score);
@@ -1066,7 +1080,22 @@
                 
                 reqs.forEach(r => {
                     const off = allData.find(x => x.idCard === r.officialId) || {};
-                    let dateStr = r.timestamp ? new Date(r.timestamp.toDate()).toLocaleDateString('th-TH') : r.dateStr;
+                    
+                    // ปรับปรุงการตรวจสอบและการดึงค่าวันที่
+                    let dateStr = "-";
+                    if (r.timestamp) {
+                         if (typeof r.timestamp.toDate === 'function') {
+                            dateStr = new Date(r.timestamp.toDate()).toLocaleDateString('th-TH');
+                        } else if (r.timestamp.seconds) {
+                            dateStr = new Date(r.timestamp.seconds * 1000).toLocaleDateString('th-TH');
+                        } else {
+                             let d = new Date(r.timestamp);
+                            if (!isNaN(d.getTime())) dateStr = d.toLocaleDateString('th-TH');
+                            else dateStr = r.dateStr || "-";
+                        }
+                    } else if (r.dateStr) {
+                         dateStr = r.dateStr;
+                    }
 
                     let proof = r.fileUrl ? `<a href="${r.fileUrl}" target="_blank" class="text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg text-xs ml-2 hover:bg-blue-100 font-bold inline-flex items-center"><i class="fa-solid fa-paperclip mr-1"></i> ดูหลักฐานที่แนบ</a>` : `<span class="text-xs text-red-500 ml-2">ไม่มีไฟล์แนบ</span>`;
                     let badge = r.type === 'APPEAL' ? `<span class="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-[10px] font-bold"><i class="fa-solid fa-gavel"></i> อุทธรณ์</span>` : `<span class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-[10px] font-bold"><i class="fa-solid fa-hand-holding-hand"></i> ขอคะแนน</span>`;
@@ -1283,7 +1312,22 @@
                 reqsSnap.forEach(doc => {
                     let r = doc.data();
                     let badge = r.type === 'APPEAL' ? `<span class="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-[10px] font-bold">อุทธรณ์</span>` : `<span class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-[10px] font-bold">ขอคะแนน</span>`;
-                    let dateStr = r.timestamp ? new Date(r.timestamp.toDate()).toLocaleDateString('th-TH') : r.dateStr;
+                    
+                    // ปรับปรุงการตรวจสอบและการดึงค่าวันที่
+                    let dateStr = "-";
+                    if (r.timestamp) {
+                         if (typeof r.timestamp.toDate === 'function') {
+                            dateStr = new Date(r.timestamp.toDate()).toLocaleDateString('th-TH');
+                        } else if (r.timestamp.seconds) {
+                            dateStr = new Date(r.timestamp.seconds * 1000).toLocaleDateString('th-TH');
+                        } else {
+                             let d = new Date(r.timestamp);
+                            if (!isNaN(d.getTime())) dateStr = d.toLocaleDateString('th-TH');
+                            else dateStr = r.dateStr || "-";
+                        }
+                    } else if (r.dateStr) {
+                         dateStr = r.dateStr;
+                    }
 
                     let statT = '', statD = '';
                     if (r.statTam === 'Approved') {
@@ -1505,4 +1549,3 @@
     </script>
 </body>
 </html>
-
