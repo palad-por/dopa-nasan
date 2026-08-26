@@ -42,7 +42,7 @@
                 </button>
             </div>
             <div class="mt-6 flex items-center text-sm text-white/90 bg-black/10 w-fit px-4 py-1.5 rounded-full">
-                <i class="fa-regular fa-clock mr-2"></i> อัปเดตล่าสุด: <span id="lastUpdate" class="font-bold ml-1 mr-3">กำลังโหลด...</span>
+                <i class="fa-regular fa-clock mr-2"></i> อัปเดตล่าสุด: <span id="lastUpdate" class="font-bold ml-1 mr-3">กำลังโหลดข้อมูลอัตโนมัติ...</span>
                 <button onclick="fetchData()" class="hover:text-yellow-300 transition active:scale-95" title="รีเฟรชข้อมูล"><i class="fa-solid fa-rotate-right"></i></button>
             </div>
         </div>
@@ -113,7 +113,7 @@
                         <tr>
                             <th class="p-4 w-28">วันที่</th>
                             <th class="p-4">รายละเอียดกิจกรรม</th>
-                            <th class="p-4 text-right w-24">คะแนน</th>
+                            <th class="p-4 text-center w-24">คะแนน</th>
                             <th class="p-4 text-center w-28 hidden md:table-cell">หลักฐาน</th>
                         </tr>
                     </thead>
@@ -146,16 +146,22 @@
         const basePath = `artifacts/${appId}/public/data`;
 
         let allData = [];
+        let authReady = false; // ตัวแปรสำหรับตรวจสอบว่าล็อกอินเสร็จหรือยัง
 
-        // แก้ไขให้โหลดข้อมูลอัตโนมัติทันทีที่เปิดหน้าเว็บ
+        // ตรวจสอบการเปลี่ยนแปลงสถานะ Authentication (แก้ปัญหาข้อมูลไม่แสดงอัตโนมัติ)
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                authReady = true;
+                fetchData(); // ดึงข้อมูลทันทีเมื่อพร้อม
+            }
+        });
+
+        // ล็อกอินแบบไม่ระบุตัวตน (เรียกใช้ครั้งเดียวตอนเปิดหน้าเว็บ)
         document.addEventListener('DOMContentLoaded', () => {
-            auth.signInAnonymously().then(() => {
-                fetchData();
-                // เรียลไทม์อัปเดตเมื่อข้อมูลมีการเปลี่ยนแปลง
-                db.collection(`${basePath}/officials`).onSnapshot(() => {
-                    fetchData();
-                });
-            }).catch(console.error);
+            auth.signInAnonymously().catch((error) => {
+                console.error("Authentication Error:", error);
+                document.getElementById('lastUpdate').innerText = "เกิดข้อผิดพลาดในการเชื่อมต่อ";
+            });
         });
 
         function goToLogin() {
@@ -164,13 +170,17 @@
         }
 
         function fetchData() {
+            if (!authReady) return; // ป้องกันการดึงข้อมูลก่อนล็อกอินเสร็จ
+
+            document.getElementById('lastUpdate').innerText = "กำลังอัปเดต...";
+            
             db.collection(`${basePath}/officials`).get()
                 .then(snap => {
                     allData = snap.docs.map(doc => {
                         let data = doc.data();
                         return {
                             idCard: data.idCard,
-                            idCardHash: btoa(data.idCard), // จำลอง Hash สำหรับการอ้างอิง
+                            idCardHash: btoa(data.idCard),
                             fullName: data.fullName,
                             position: data.position,
                             village: data.village,
@@ -244,20 +254,44 @@
             });
         }
 
+        // ฟังก์ชันแปลงวันที่และเรียงลำดับให้ถูกต้อง
+        function parseDateForSort(dateStr, timestamp) {
+             let d = new Date(0);
+             if (timestamp) {
+                  if (typeof timestamp.toDate === 'function') d = timestamp.toDate();
+                  else if (timestamp.seconds) d = new Date(timestamp.seconds * 1000);
+                  else {
+                      let temp = new Date(timestamp);
+                      if(!isNaN(temp.getTime())) d = temp;
+                  }
+             }
+             if (d.getTime() === 0 && dateStr) {
+                 let parts = dateStr.split(/[-/]/);
+                 if (parts.length === 3) {
+                     let y = parts[0].length === 4 ? parts[0] : (parts[2].length === 4 ? parts[2] : null);
+                     let m = parts[1];
+                     let day = parts[0].length === 4 ? parts[2] : parts[0];
+                     if (y) {
+                         if (parseInt(y) > 2500) y = parseInt(y) - 543;
+                         let temp = new Date(`${y}-${m}-${day}`);
+                         if(!isNaN(temp.getTime())) d = temp;
+                     }
+                 }
+             }
+             return d.getTime();
+        }
+
         // ฟังก์ชันแปลงวันที่ให้เป็นแบบไทย DD/MM/YYYY
-        function formatThaiDate(dStr) {
-            if (!dStr) return "-";
-            try {
-                let d = new Date(dStr);
-                if (isNaN(d.getTime())) return dStr;
+        function formatThaiDate(dStr, timestamp) {
+            let sortVal = parseDateForSort(dStr, timestamp);
+            if (sortVal > 0) {
+                let d = new Date(sortVal);
                 let day = String(d.getDate()).padStart(2, '0');
                 let month = String(d.getMonth() + 1).padStart(2, '0');
-                let year = d.getFullYear();
-                if (year < 2500) year += 543;
+                let year = d.getFullYear() + 543;
                 return `${day}/${month}/${year}`;
-            } catch(e) {
-                return dStr;
             }
+            return dStr || "-";
         }
 
         function viewHist(idHash, name, pos) {
@@ -275,31 +309,33 @@
                     tb.innerHTML = '';
                     if(snap.empty) { tb.innerHTML='<tr><td colspan="4" class="text-center p-8 text-slate-400 bg-slate-50">ยังไม่มีประวัติการประเมิน</td></tr>'; return; }
                     
-                    // นำข้อมูลมาเรียงลำดับวันที่ ล่าสุดอยู่บน
                     let logsArr = [];
                     snap.docs.forEach(doc => logsArr.push(doc.data()));
+                    
+                    // เรียงลำดับตามวันที่ทำกิจกรรม ล่าสุดอยู่บนสุด
                     logsArr.sort((a, b) => {
-                        let dateA = new Date(a.dateStr || a.timestamp || 0);
-                        let dateB = new Date(b.dateStr || b.timestamp || 0);
+                        let dateA = parseDateForSort(a.dateStr, a.timestamp);
+                        let dateB = parseDateForSort(b.dateStr, b.timestamp);
                         return dateB - dateA;
                     });
                     
                     logsArr.forEach(l => {
-                        let dateStr = formatThaiDate(l.dateStr || l.timestamp);
+                        let dateDisplay = formatThaiDate(l.dateStr, l.timestamp);
                         let scoreDisplay = (l.type === 'negative' ? '-' : '+') + Math.abs(l.score);
                         let scoreHtml = `<span class="${l.type==='positive'?'text-green-600':'text-red-600'}">${scoreDisplay}</span>`;
                         
+                        // สร้างปุ่มหลักฐาน (แสดง "-" สีเทาๆ ถ้าไม่มีหลักฐาน)
                         let proof = l.proofUrl ? `<a href="${l.proofUrl}" target="_blank" class="text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-600 hover:text-white transition whitespace-nowrap inline-flex items-center justify-center gap-1 w-full md:w-auto"><i class="fa-solid fa-paperclip"></i> ดูไฟล์</a>` : '<span class="text-slate-300">-</span>';
                         
                         tb.innerHTML += `<tr class="hover:bg-slate-50 transition border-b border-slate-50">
-                            <td class="p-3 md:p-4 text-[10px] md:text-xs text-slate-500 font-mono align-top pt-4 md:pt-5">${dateStr}</td>
+                            <td class="p-3 md:p-4 text-[10px] md:text-xs text-slate-500 font-mono align-top pt-4 md:pt-5">${dateDisplay}</td>
                             <td class="p-3 md:p-4 text-sm align-top">
                                 <div class="text-slate-800 font-medium leading-relaxed">${l.activityName}</div>
                                 <div class="text-xs text-slate-500 mt-1 whitespace-pre-wrap">${l.activityDetail || ''}</div>
                                 <!-- แสดงปุ่มหลักฐานใต้ชื่อกิจกรรมเฉพาะบนมือถือ -->
                                 <div class="mt-3 block md:hidden w-fit">${proof}</div>
                             </td>
-                            <td class="p-3 md:p-4 text-right font-bold text-lg md:text-xl align-top pt-4 md:pt-5">${scoreHtml}</td>
+                            <td class="p-3 md:p-4 text-center font-bold text-lg md:text-xl align-top pt-4 md:pt-5">${scoreHtml}</td>
                             <!-- ซ่อนคอลัมน์หลักฐานบนมือถือ (เพราะย้ายไปไว้ใต้ชื่อกิจกรรมแล้ว) -->
                             <td class="p-4 text-center align-top pt-5 hidden md:table-cell">${proof}</td>
                         </tr>`;
