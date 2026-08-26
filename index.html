@@ -262,8 +262,22 @@
                     snap.docs.forEach(doc => {
                         let l = doc.data();
                         
-                        let dateStr = l.timestamp ? new Date(l.timestamp.toDate()).toLocaleDateString('th-TH') : l.dateStr;
-                        if (!dateStr) dateStr = "-";
+                        // ปรับปรุงการตรวจสอบและการดึงค่าวันที่
+                        let dateStr = "-";
+                        if (l.timestamp) {
+                            if (typeof l.timestamp.toDate === 'function') {
+                                dateStr = new Date(l.timestamp.toDate()).toLocaleDateString('th-TH');
+                            } else if (l.timestamp.seconds) { // รองรับกรณีเป็น Timestamp object แต่ไม่ใช่ instance 
+                                dateStr = new Date(l.timestamp.seconds * 1000).toLocaleDateString('th-TH');
+                            } else {
+                                // พยายามแปลงจากค่าอื่นๆ (เช่น string/number)
+                                let d = new Date(l.timestamp);
+                                if (!isNaN(d.getTime())) dateStr = d.toLocaleDateString('th-TH');
+                                else dateStr = l.dateStr || "-";
+                            }
+                        } else if (l.dateStr) {
+                             dateStr = l.dateStr;
+                        }
 
                         let scoreDisplay = (l.type === 'negative' ? '-' : '+') + Math.abs(l.score);
                         let scoreHtml = `<span class="${l.type==='positive'?'text-green-600':'text-red-600'}">${scoreDisplay}</span>`;
@@ -289,5 +303,3 @@
     </script>
 </body>
 </html>
-
-
