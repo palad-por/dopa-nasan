@@ -114,7 +114,7 @@
                             <th class="p-4 w-28">วันที่</th>
                             <th class="p-4">รายละเอียดกิจกรรม</th>
                             <th class="p-4 text-right w-24">คะแนน</th>
-                            <th class="p-4 text-center w-28">หลักฐาน</th>
+                            <th class="p-4 text-center w-28 hidden md:table-cell">หลักฐาน</th>
                         </tr>
                     </thead>
                     <tbody id="histBody" class="divide-y divide-slate-50 text-sm"></tbody>
@@ -147,20 +147,20 @@
 
         let allData = [];
 
-        window.onload = function() {
-            // ล็อกอินแบบไม่ระบุตัวตนเพื่ออ่านข้อมูล Firebase
+        // แก้ไขให้โหลดข้อมูลอัตโนมัติทันทีที่เปิดหน้าเว็บ
+        document.addEventListener('DOMContentLoaded', () => {
             auth.signInAnonymously().then(() => {
                 fetchData();
-                // ใช้ Real-time Listener แทน setInterval
+                // เรียลไทม์อัปเดตเมื่อข้อมูลมีการเปลี่ยนแปลง
                 db.collection(`${basePath}/officials`).onSnapshot(() => {
                     fetchData();
                 });
             }).catch(console.error);
-        };
+        });
 
         function goToLogin() {
             document.getElementById('lastUpdate').innerText = "กำลังเปลี่ยนหน้า...";
-            window.location.href = "admin.html"; // เชื่อมไปหน้าหลังบ้าน
+            window.location.href = "admin.html"; 
         }
 
         function fetchData() {
@@ -244,6 +244,22 @@
             });
         }
 
+        // ฟังก์ชันแปลงวันที่ให้เป็นแบบไทย DD/MM/YYYY
+        function formatThaiDate(dStr) {
+            if (!dStr) return "-";
+            try {
+                let d = new Date(dStr);
+                if (isNaN(d.getTime())) return dStr;
+                let day = String(d.getDate()).padStart(2, '0');
+                let month = String(d.getMonth() + 1).padStart(2, '0');
+                let year = d.getFullYear();
+                if (year < 2500) year += 543;
+                return `${day}/${month}/${year}`;
+            } catch(e) {
+                return dStr;
+            }
+        }
+
         function viewHist(idHash, name, pos) {
             document.getElementById('histTitle').innerText = name;
             document.getElementById('histSub').innerText = pos;
@@ -252,46 +268,40 @@
             
             tb.innerHTML = '<tr><td colspan="4" class="text-center p-10 text-indigo-500"><i class="fa-solid fa-spinner fa-spin text-3xl"></i></td></tr>';
             
-            const targetId = atob(idHash); // ถอดรหัสกลับเป็นเลขบัตร
+            const targetId = atob(idHash); 
             
-            db.collection(`${basePath}/score_logs`).where('idCard', '==', targetId).orderBy('timestamp', 'desc').get()
+            db.collection(`${basePath}/score_logs`).where('idCard', '==', targetId).get()
                 .then(snap => {
                     tb.innerHTML = '';
                     if(snap.empty) { tb.innerHTML='<tr><td colspan="4" class="text-center p-8 text-slate-400 bg-slate-50">ยังไม่มีประวัติการประเมิน</td></tr>'; return; }
                     
-                    snap.docs.forEach(doc => {
-                        let l = doc.data();
-                        
-                        // ปรับปรุงการตรวจสอบและการดึงค่าวันที่
-                        let dateStr = "-";
-                        if (l.timestamp) {
-                            if (typeof l.timestamp.toDate === 'function') {
-                                dateStr = new Date(l.timestamp.toDate()).toLocaleDateString('th-TH');
-                            } else if (l.timestamp.seconds) { // รองรับกรณีเป็น Timestamp object แต่ไม่ใช่ instance 
-                                dateStr = new Date(l.timestamp.seconds * 1000).toLocaleDateString('th-TH');
-                            } else {
-                                // พยายามแปลงจากค่าอื่นๆ (เช่น string/number)
-                                let d = new Date(l.timestamp);
-                                if (!isNaN(d.getTime())) dateStr = d.toLocaleDateString('th-TH');
-                                else dateStr = l.dateStr || "-";
-                            }
-                        } else if (l.dateStr) {
-                             dateStr = l.dateStr;
-                        }
-
+                    // นำข้อมูลมาเรียงลำดับวันที่ ล่าสุดอยู่บน
+                    let logsArr = [];
+                    snap.docs.forEach(doc => logsArr.push(doc.data()));
+                    logsArr.sort((a, b) => {
+                        let dateA = new Date(a.dateStr || a.timestamp || 0);
+                        let dateB = new Date(b.dateStr || b.timestamp || 0);
+                        return dateB - dateA;
+                    });
+                    
+                    logsArr.forEach(l => {
+                        let dateStr = formatThaiDate(l.dateStr || l.timestamp);
                         let scoreDisplay = (l.type === 'negative' ? '-' : '+') + Math.abs(l.score);
                         let scoreHtml = `<span class="${l.type==='positive'?'text-green-600':'text-red-600'}">${scoreDisplay}</span>`;
                         
-                        let proof = l.proofUrl ? `<a href="${l.proofUrl}" target="_blank" class="text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-600 hover:text-white transition whitespace-nowrap flex items-center justify-center gap-1"><i class="fa-solid fa-paperclip"></i> ดูไฟล์</a>` : '-';
+                        let proof = l.proofUrl ? `<a href="${l.proofUrl}" target="_blank" class="text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-600 hover:text-white transition whitespace-nowrap inline-flex items-center justify-center gap-1 w-full md:w-auto"><i class="fa-solid fa-paperclip"></i> ดูไฟล์</a>` : '<span class="text-slate-300">-</span>';
                         
                         tb.innerHTML += `<tr class="hover:bg-slate-50 transition border-b border-slate-50">
-                            <td class="p-4 text-xs text-slate-500 font-mono align-top pt-5">${dateStr}</td>
-                            <td class="p-4 text-sm align-top">
+                            <td class="p-3 md:p-4 text-[10px] md:text-xs text-slate-500 font-mono align-top pt-4 md:pt-5">${dateStr}</td>
+                            <td class="p-3 md:p-4 text-sm align-top">
                                 <div class="text-slate-800 font-medium leading-relaxed">${l.activityName}</div>
                                 <div class="text-xs text-slate-500 mt-1 whitespace-pre-wrap">${l.activityDetail || ''}</div>
+                                <!-- แสดงปุ่มหลักฐานใต้ชื่อกิจกรรมเฉพาะบนมือถือ -->
+                                <div class="mt-3 block md:hidden w-fit">${proof}</div>
                             </td>
-                            <td class="p-4 text-right font-bold text-xl align-top pt-5">${scoreHtml}</td>
-                            <td class="p-4 text-center align-top pt-5">${proof}</td>
+                            <td class="p-3 md:p-4 text-right font-bold text-lg md:text-xl align-top pt-4 md:pt-5">${scoreHtml}</td>
+                            <!-- ซ่อนคอลัมน์หลักฐานบนมือถือ (เพราะย้ายไปไว้ใต้ชื่อกิจกรรมแล้ว) -->
+                            <td class="p-4 text-center align-top pt-5 hidden md:table-cell">${proof}</td>
                         </tr>`;
                     });
                 })
