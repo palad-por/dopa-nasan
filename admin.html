@@ -226,7 +226,7 @@
             <div class="flex-grow overflow-auto p-4 custom-scroll relative bg-slate-50">
                 <div class="overflow-x-auto bg-white rounded-xl shadow-sm border border-slate-200">
                     <table class="w-full text-left min-w-[600px]">
-                        <thead class="bg-slate-50 text-slate-500 text-xs uppercase border-b"><tr><th class="p-4 w-24">วันที่</th><th class="p-4">หมวดและรายละเอียดกิจกรรม</th><th class="p-4 text-right w-20">คะแนน</th><th class="p-4 text-center w-28 hidden md:table-cell">จัดการ/หลักฐาน</th></tr></thead>
+                        <thead class="bg-slate-50 text-slate-500 text-xs uppercase border-b"><tr><th class="p-4 w-24">วันที่</th><th class="p-4">รายละเอียดกิจกรรม</th><th class="p-4 text-right w-20">คะแนน</th><th class="p-4 text-center w-28 hidden md:table-cell">จัดการ/หลักฐาน</th></tr></thead>
                         <tbody id="histBody" class="divide-y divide-slate-100 text-sm"></tbody>
                     </table>
                 </div>
@@ -423,14 +423,13 @@
                 let foundAdmin = null;
                 usersSnap.forEach(doc => {
                     let d = doc.data();
-                    let storedUser = (d.username || d.Username || '').toLowerCase();
-                    let storedPass = (d.password || d.Password || '');
+                    let storedUser = String(d.username || d.Username || '').toLowerCase();
+                    let storedPass = String(d.password || d.Password || '');
                     
-                    // บังคับแปลงเป็น String ก่อนเทียบ ป้องกันบัก Number จาก Excel
-                    if(String(storedUser) === String(u) && String(storedPass) === String(p)) {
+                    if(storedUser === u && storedPass === p) {
                         foundAdmin = { 
-                            username: d.username || d.Username, 
-                            role: (d.role || d.Role || 'tambon').toLowerCase(), 
+                            username: storedUser, 
+                            role: String(d.role || d.Role || 'tambon').toLowerCase(), 
                             filter: d.filter || d.Filter, 
                             name: d.name || d.DisplayName || d.displayName, 
                             docId: doc.id 
@@ -808,19 +807,42 @@
         }
 
         // ฟังก์ชันแปลงวันที่ให้เป็นแบบไทย DD/MM/YYYY
-        function formatThaiDate(dStr) {
-            if (!dStr) return "-";
-            try {
-                let d = new Date(dStr);
-                if (isNaN(d.getTime())) return dStr;
+        function formatThaiDate(dStr, timestamp) {
+            let sortVal = parseDateForSort(dStr, timestamp);
+            if (sortVal > 0) {
+                let d = new Date(sortVal);
                 let day = String(d.getDate()).padStart(2, '0');
                 let month = String(d.getMonth() + 1).padStart(2, '0');
-                let year = d.getFullYear();
-                if (year < 2500) year += 543;
+                let year = d.getFullYear() + 543;
                 return `${day}/${month}/${year}`;
-            } catch(e) {
-                return dStr;
             }
+            return dStr || "-";
+        }
+        
+        function parseDateForSort(dateStr, timestamp) {
+             let d = new Date(0);
+             if (timestamp) {
+                  if (typeof timestamp.toDate === 'function') d = timestamp.toDate();
+                  else if (timestamp.seconds) d = new Date(timestamp.seconds * 1000);
+                  else {
+                      let temp = new Date(timestamp);
+                      if(!isNaN(temp.getTime())) d = temp;
+                  }
+             }
+             if (d.getTime() === 0 && dateStr) {
+                 let parts = dateStr.split(/[-/]/);
+                 if (parts.length === 3) {
+                     let y = parts[0].length === 4 ? parts[0] : (parts[2].length === 4 ? parts[2] : null);
+                     let m = parts[1];
+                     let day = parts[0].length === 4 ? parts[2] : parts[0];
+                     if (y) {
+                         if (parseInt(y) > 2500) y = parseInt(y) - 543;
+                         let temp = new Date(`${y}-${m}-${day}`);
+                         if(!isNaN(temp.getTime())) d = temp;
+                     }
+                 }
+             }
+             return d.getTime();
         }
 
         async function manageHistory(idCard, name) {
@@ -842,52 +864,88 @@
                 
                 if(logsSnap.empty) { tb.innerHTML='<tr><td colspan="4" class="text-center p-6 text-slate-400">ไม่มีประวัติ</td></tr>'; return; }
                 
-                // นำข้อมูลมาเรียงลำดับวันที่ ล่าสุดอยู่บน
                 let logsArr = [];
                 logsSnap.docs.forEach(doc => logsArr.push({id: doc.id, ...doc.data()}));
-                logsArr.sort((a, b) => {
-                    let dateA = new Date(a.dateStr || a.timestamp || 0);
-                    let dateB = new Date(b.dateStr || b.timestamp || 0);
-                    return dateB - dateA;
-                });
+                
+                // จัดกลุ่มคะแนนเหมือนหน้าแดชบอร์ด
+                let grouped = {};
+                let order = [];
                 
                 logsArr.forEach(l => {
-                    let logId = l.id;
-                    let dateStr = formatThaiDate(l.dateStr || l.timestamp);
+                    let sortTime = parseDateForSort(l.dateStr, l.timestamp);
+                    let key = sortTime + '_' + l.activityName;
+                    let rawSc = Number(l.score) || 0;
+                    let actualScore = l.type === 'negative' ? -Math.abs(rawSc) : Math.abs(rawSc);
                     let catName = CRITERIA[l.categoryId] ? CRITERIA[l.categoryId].name : l.categoryId;
-                    let scoreDisplay = (l.type === 'negative' ? '-' : '+') + Math.abs(l.score);
                     
-                    let proof = l.proofUrl ? `<a href="${l.proofUrl}" target="_blank" class="text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-100 whitespace-nowrap inline-flex items-center w-full md:w-auto justify-center"><i class="fa-solid fa-paperclip mr-1"></i> ดูไฟล์</a>` : '<span class="text-slate-300">-</span>';
+                    if (!grouped[key]) {
+                        grouped[key] = {
+                            ids: [l.id],
+                            primaryCatId: l.categoryId,
+                            sortTime: sortTime,
+                            dateStr: l.dateStr,
+                            timestamp: l.timestamp,
+                            activityName: l.activityName, 
+                            activityDetail: l.activityDetail || '',
+                            rawScore: actualScore, 
+                            type: l.type,
+                            recordedBy: l.recordedBy,
+                            proof: l.proofUrl || l.ProofLink || '',
+                            breakdowns: [{ name: catName, score: actualScore }]
+                        };
+                        order.push(key);
+                    } else {
+                        grouped[key].ids.push(l.id);
+                        grouped[key].rawScore += actualScore;
+                        grouped[key].breakdowns.push({ name: catName, score: actualScore });
+                        grouped[key].type = grouped[key].rawScore < 0 ? 'negative' : 'positive';
+                    }
+                });
+
+                let finalHistory = order.map(k => grouped[k]);
+                finalHistory.sort((a, b) => b.sortTime - a.sortTime); // ล่าสุดอยู่บน
+                
+                finalHistory.forEach(l => {
+                    let logId = l.ids[0]; // ใช้ id ตัวแรกเป็นตัวแทน
+                    let dateDisplay = formatThaiDate(l.dateStr, l.timestamp);
+                    let isNegative = l.rawScore < 0;
+                    let scoreDisplay = (isNegative ? '' : '+') + l.rawScore;
+                    let scoreHtml = `<span class="${!isNegative ? 'text-green-600' : 'text-red-600'}">${scoreDisplay}</span>`;
                     
-                    let actionDesktop = proof;
-                    let actionMobile = proof;
+                    let breakdownHtml = l.breakdowns.map(b => 
+                        `<span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[10px] mr-1 mt-1 border border-indigo-100 inline-block">${b.name} (${b.score > 0 ? '+' : ''}${b.score})</span>`
+                    ).join('');
                     
-                    if(curUser.role==='user' && l.type==='negative') {
+                    let proofLink = l.proof ? l.proof : '';
+                    let proofBtn = proofLink ? `<a href="${proofLink}" target="_blank" class="text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-100 whitespace-nowrap inline-flex items-center w-full justify-center mt-2"><i class="fa-solid fa-paperclip mr-1"></i> ดูไฟล์หลักฐาน</a>` : '';
+                    let proofBtnDesktop = proofLink ? `<a href="${proofLink}" target="_blank" class="text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-100 whitespace-nowrap inline-flex items-center w-full justify-center mb-2"><i class="fa-solid fa-paperclip mr-1"></i> ดูไฟล์</a>` : '<span class="text-slate-300">-</span>';
+                    
+                    let actionDesktop = proofBtnDesktop;
+                    let actionMobile = proofBtn;
+                    
+                    if(curUser.role==='user' && isNegative) {
                         if (appealedLogIds.has(logId)) {
                             let apBtn = `<div class="mt-2 text-[10px] bg-slate-100 text-slate-500 px-3 py-1.5 rounded-lg font-bold w-full text-center border border-slate-200">ยื่นอุทธรณ์แล้ว</div>`;
                             actionDesktop += apBtn; actionMobile += apBtn;
                         } else {
-                            let apBtn = `<button onclick="openAppeal('${l.categoryId}', '${l.activityName}', ${l.score}, '${logId}')" class="mt-2 text-[10px] bg-orange-500 text-white px-3 py-1.5 rounded-lg font-bold w-full shadow-sm hover:bg-orange-600">ยื่นอุทธรณ์</button>`;
+                            let apBtn = `<button onclick="openAppeal('${l.primaryCatId}', '${l.activityName}', ${l.rawScore}, '${l.ids.join(',')}')" class="mt-2 text-[10px] bg-orange-500 text-white px-3 py-1.5 rounded-lg font-bold w-full shadow-sm hover:bg-orange-600">ยื่นอุทธรณ์</button>`;
                             actionDesktop += apBtn; actionMobile += apBtn;
                         }
                     } else if (curUser.role === 'district') {
-                        let admBtns = `<div class="flex gap-2 mt-2 justify-center">
-                            <button onclick="openEditLog('${logId}', '${idCard}', '${l.categoryId}', '${l.activityName}', '${l.activityDetail || ''}', ${l.score})" class="bg-amber-100 text-amber-600 p-2 rounded-lg hover:bg-amber-200"><i class="fa-solid fa-pen text-[10px]"></i></button>
-                            <button onclick="deleteLog('${logId}', '${idCard}')" class="bg-red-100 text-red-600 p-2 rounded-lg hover:bg-red-200"><i class="fa-solid fa-trash text-[10px]"></i></button>
+                        let idsParam = l.ids.join(',');
+                        let admBtns = `<div class="flex gap-2 mt-2 justify-center w-full">
+                            <button onclick="deleteLogGroup('${idsParam}', '${idCard}')" class="bg-red-100 text-red-600 p-2 rounded-lg hover:bg-red-200 w-full"><i class="fa-solid fa-trash text-[10px] mr-1"></i> ลบ</button>
                         </div>`;
                         actionDesktop += admBtns; actionMobile += admBtns;
                     }
-                    
-                    let scoreHtml = `<span class="${l.type==='positive'?'text-green-600':'text-red-600'}">${scoreDisplay}</span>`;
 
                     tb.innerHTML += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition">
-                        <td class="p-3 md:p-4 text-[10px] md:text-xs text-slate-500 font-mono align-top pt-4 md:pt-5">${dateStr}</td>
+                        <td class="p-3 md:p-4 text-[10px] md:text-xs text-slate-500 font-mono align-top pt-4 md:pt-5">${dateDisplay}</td>
                         <td class="p-3 md:p-4 text-sm align-top">
                             <div class="text-slate-800 font-bold">${l.activityName}</div>
-                            <div class="mb-1.5"><span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[10px] border border-indigo-100">${catName}</span></div>
-                            <div class="text-xs text-slate-600 mt-1 whitespace-pre-wrap">${l.activityDetail || ''}</div>
+                            <div class="mb-1.5">${breakdownHtml}</div>
+                            <div class="text-xs text-slate-600 mt-1 whitespace-pre-wrap">${l.activityDetail}</div>
                             <div class="text-[10px] text-slate-400 mt-2"><i class="fa-solid fa-user-pen"></i> ผู้บันทึก: ${l.recordedBy || '-'}</div>
-                            
                             <!-- ปุ่ม Action บนมือถือจะมาอยู่ใต้ชื่อกิจกรรม -->
                             <div class="mt-3 block md:hidden w-fit">${actionMobile}</div>
                         </td>
@@ -912,12 +970,17 @@
             await db.collection(`${basePath}/officials`).doc(idCard).update({ totalScore: newTotal });
         }
 
-        function deleteLog(logId, idCard) {
-            Swal.fire({title: 'ลบประวัตินี้?', text: 'คะแนนที่เลือกจะถูกลบและคำนวณใหม่', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444'}).then(async r => {
+        function deleteLogGroup(idsStr, idCard) {
+            Swal.fire({title: 'ลบประวัตินี้?', text: 'ก้อนคะแนนนี้ทั้งหมดจะถูกลบและคำนวณใหม่', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444'}).then(async r => {
                 if(r.isConfirmed) {
                     setLoad(true);
                     try {
-                        await db.collection(`${basePath}/score_logs`).doc(logId).delete();
+                        let ids = idsStr.split(',');
+                        const batch = db.batch();
+                        ids.forEach(id => {
+                            batch.delete(db.collection(`${basePath}/score_logs`).doc(id));
+                        });
+                        await batch.commit();
                         await recalculateScore(idCard);
                         initAdmin(); 
                         manageHistory(idCard, document.getElementById('histTitle').innerText.replace('ประวัติ: ',''));
@@ -1025,9 +1088,9 @@
             return opts;
         }
 
-        function openAppeal(catId, actName, score, logId) {
+        function openAppeal(catId, actName, score, logIdsStr) {
             closeModal('histModal');
-            document.getElementById('appealLogId').value = logId;
+            document.getElementById('appealLogId').value = logIdsStr;
             document.getElementById('appealCatId').value = catId;
             document.getElementById('appealTitle').value = actName;
             document.getElementById('appealScore').value = Math.abs(score);
@@ -1234,7 +1297,8 @@
             }
         }
 
-        async function approveAction(reqDocId, role, action, score, idCard='', origCatId='', origActName='', origActDetail='', type='', refLogId='') {
+        // --- เพิ่มฟังก์ชันจัดการอุทธรณ์กลับ ---
+        async function approveAction(reqDocId, role, action, score, idCard='', origCatId='', origActName='', origActDetail='', type='', refLogIds='') {
             let finalScore = score;
             let finalCat = origCatId;
             let finalActName = origActName;
@@ -1269,9 +1333,14 @@
                         if (role === 'tambon') await reqRef.update({ statTam: 'Approved', statDist: 'Auto-Approved' });
                         else await reqRef.update({ statDist: 'Approved' });
 
-                        // ลบ log เก่า
-                        if (refLogId) {
-                            await db.collection(`${basePath}/score_logs`).doc(refLogId).delete().catch(e => console.log('Log not found'));
+                        // ลบ log ก้อนเก่าทิ้ง
+                        if (refLogIds) {
+                            const ids = refLogIds.split(',');
+                            const batch = db.batch();
+                            ids.forEach(id => {
+                                batch.delete(db.collection(`${basePath}/score_logs`).doc(id));
+                            });
+                            await batch.commit();
                         }
 
                         if (action === 'EditScore') {
