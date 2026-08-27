@@ -119,6 +119,18 @@
                 const querySnapshot = await getDocs(collection(db, `${basePath}/${currentTable}`));
                 querySnapshot.forEach((document) => {
                     let data = document.data();
+                    
+                    // V25 Fix: สำหรับตาราง requests_appeals พยายามดึงคีย์ต่างๆ ที่อาจจะเพี้ยนจาก Excel
+                    if (currentTable === 'requests_appeals') {
+                        data.ReqID = data.ReqID || data.reqId || document.id;
+                        data.Type = data.Type || data.type || '';
+                        data.ID_Card = data.ID_Card || data.idCard || data.officialId || '';
+                        data.FullName = data.FullName || data.fullName || '';
+                        data.ActivityName = data.ActivityName || data.activityName || '';
+                        data.RequestedScore = data.RequestedScore || data.reqScore || data.requestedScore || 0;
+                        data.StatusDistrict = data.StatusDistrict || data.statDist || data.statusDistrict || '';
+                    }
+
                     let normalized = { ...data, _firebaseDocId: document.id, _isDirty: false };
                     tableData.push(normalized);
                 });
