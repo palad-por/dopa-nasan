@@ -4,9 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ระบบจัดการ DOPA NASAN Score</title>
-    <!-- 5. เพิ่ม Favicon -->
-    <link rel="icon" href="DOPA_NASAN_Score_App_Icons/favicon.ico" type="image/x-icon">
-    <link rel="apple-touch-icon" href="DOPA_NASAN_Score_App_Icons/apple-touch-icon.png">
+    
+    <link rel="icon" href="DOPA_NASAN_Score_App_Icons/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="DOPA_NASAN_Score_App_Icons/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="DOPA_NASAN_Score_App_Icons/favicon-48.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="DOPA_NASAN_Score_App_Icons/apple-touch-icon.png">
+    <link rel="manifest" href="DOPA_NASAN_Score_App_Icons/manifest.webmanifest">
+    <meta name="theme-color" content="#1e293b">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -55,7 +59,6 @@
     </div>
 
     <div id="app" class="flex-col h-screen hidden">
-        <!-- Header -->
         <header class="glass-header text-white shadow-lg flex-none px-4 py-3 md:px-6 md:py-4 flex justify-between items-center z-20">
             <div class="flex items-center gap-3">
                 <div class="bg-white/20 p-2 rounded-lg"><i class="fa-solid fa-user-tie text-xl"></i></div>
@@ -222,12 +225,12 @@
 
     <!-- 2. Edit / Delete / History Modal -->
     <div id="histModal" class="hidden fixed inset-0 bg-slate-900/90 z-50 flex items-start md:items-center justify-center p-0 md:p-4 backdrop-blur-sm">
-        <div class="bg-white w-full h-full md:h-[85vh] md:max-w-5xl md:rounded-2xl flex flex-col shadow-2xl">
+        <div class="bg-white w-full h-full md:h-[85vh] md:max-w-4xl md:rounded-2xl flex flex-col shadow-2xl">
             <div class="p-4 border-b bg-slate-800 text-white md:rounded-t-2xl flex justify-between flex-none"><h3 class="font-bold" id="histTitle">ประวัติคะแนน</h3><button onclick="closeModal('histModal')" class="p-2 hover:bg-slate-700 rounded-full w-8 h-8 flex items-center justify-center"><i class="fa-solid fa-times text-xl"></i></button></div>
             <div class="flex-grow overflow-auto p-4 custom-scroll relative bg-slate-50">
                 <div class="overflow-x-auto bg-white rounded-xl shadow-sm border border-slate-200">
                     <table class="w-full text-left min-w-[500px]">
-                        <!-- 3. ตัดคอลัมน์หลักฐานออก -->
+                        <!-- เอาคอลัมน์ขวาสุดออกตามที่ร้องขอ -->
                         <thead class="bg-slate-50 text-slate-500 text-xs uppercase border-b"><tr><th class="p-4 w-28 text-center">วันที่</th><th class="p-4">รายละเอียดกิจกรรม</th><th class="p-4 text-center w-24">คะแนน</th></tr></thead>
                         <tbody id="histBody" class="divide-y divide-slate-100 text-sm"></tbody>
                     </table>
@@ -393,7 +396,7 @@
         const appId = 'dopa-nasan-score';
         const basePath = `artifacts/${appId}/public/data`;
 
-        // 1. เกณฑ์การให้คะแนนแบบเดียวกับต้นฉบับ (เอากลับมาใช้ตรวจเพดาน)
+        // เกณฑ์การให้คะแนนแบบเดียวกับต้นฉบับ
         const CRITERIA_LIST = [
           { id: '1.1.1', name: '1.1.1 งานตาม พ.ร.บ.ฯ (20)', max: 20 },
           { id: '1.1.2', name: '1.1.2 กฎหมายอื่น (5)', max: 5 },
@@ -544,9 +547,9 @@
                 .catch(err => { setLoad(false); Swal.fire('ระบบขัดข้อง', String(err.message), 'error'); });
         }
 
-        // --- FILTERS (Admin) & SORTING (2.1, 2.2) ---
+        // --- STREAMING_CHUNK:FILTERS (Admin) Sorting Fix ---
         function initFilters() {
-            // 2.1 เรียงตำบล ก-ฮ
+            // เรียงตำบลตาม ก-ฮ
             const subs = [...new Set(allData.map(i=>i.subdistrict).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'th'));
             const subOpts = '<option value="">ทุกตำบล</option>' + subs.map(s=>`<option value="${s}">${s}</option>`).join('');
             document.getElementById('filterSub').innerHTML = subOpts;
@@ -565,18 +568,23 @@
         function filterVillages() {
             const s = document.getElementById('filterSub').value;
             const vSel = document.getElementById('filterVil');
-            if(!s) vSel.innerHTML='<option value="">ทุกหมู่บ้าน</option>';
-            else {
-                // 2.2 เรียงหมู่บ้าน ตามตัวเลข
-                const vs = [...new Set(allData.filter(d=>d.subdistrict===s).map(d=>d.rawVillage).filter(Boolean))].sort((a,b)=>parseInt(a.match(/\d+/)||0)-parseInt(b.match(/\d+/)||0));
-                vSel.innerHTML='<option value="">ทุกหมู่บ้าน</option>' + vs.map(v=>`<option>${v}</option>`).join('');
-            }
+            if(!s) { vSel.innerHTML='<option value="">ทุกหมู่บ้าน</option>'; filter(); return; }
+            
+            // เรียงหมู่บ้านตามเลขหมู่
+            const vMap = new Map();
+            allData.filter(d => d.subdistrict === s && d.village).forEach(d => {
+                let mooNum = parseInt(String(d.moo || d.village.match(/\d+/)?.[0] || 0));
+                vMap.set(d.village, mooNum);
+            });
+            const vs = Array.from(vMap.keys()).sort((a,b) => vMap.get(a) - vMap.get(b));
+            
+            vSel.innerHTML='<option value="">ทุกหมู่บ้าน</option>' + vs.map(v=>`<option>${v}</option>`).join('');
             filter();
         }
 
         function filter() {
             const s = document.getElementById('filterSub').value, v = document.getElementById('filterVil').value, t = document.getElementById('search').value.toLowerCase();
-            const res = allData.filter(d => (!s || d.subdistrict===s) && (!v || d.rawVillage===v) && d.fullName.toLowerCase().includes(t));
+            const res = allData.filter(d => (!s || d.subdistrict===s) && (!v || d.village===v) && d.fullName.toLowerCase().includes(t));
             const tb = document.getElementById('tableBody'); tb.innerHTML = '';
             document.getElementById('listCount').innerText = res.length + ' คน';
             
@@ -604,19 +612,29 @@
             });
         }
 
-        // --- TARGET SELECTION (Shared logic for Score & Reset) & 2.3 Sort targets ---
+        // --- STREAMING_CHUNK:TARGET SELECTION Sorting Fix ---
         function updBaseVil() {
             const s = document.getElementById('baseSub').value;
             const vSel = document.getElementById('baseVil');
             if(!s) { vSel.innerHTML='<option value="">- เลือกหมู่บ้าน -</option>'; return; }
-            const vs = [...new Set(allData.filter(d=>d.subdistrict===s).map(d=>d.rawVillage).filter(Boolean))].sort((a,b)=>parseInt(a.match(/\d+/)||0)-parseInt(b.match(/\d+/)||0));
+            const vMap = new Map();
+            allData.filter(d => d.subdistrict === s && d.village).forEach(d => {
+                let mooNum = parseInt(String(d.moo || d.village.match(/\d+/)?.[0] || 0));
+                vMap.set(d.village, mooNum);
+            });
+            const vs = Array.from(vMap.keys()).sort((a,b) => vMap.get(a) - vMap.get(b));
             vSel.innerHTML='<option value="">- เลือกหมู่บ้าน -</option>' + vs.map(v=>`<option value="${v}">${v}</option>`).join('');
         }
         function updResetTargetBaseVil() {
             const s = document.getElementById('resetTargetBaseSub').value;
             const vSel = document.getElementById('resetTargetBaseVil');
             if(!s) { vSel.innerHTML='<option value="">- เลือกหมู่บ้าน -</option>'; return; }
-            const vs = [...new Set(allData.filter(d=>d.subdistrict===s).map(d=>d.rawVillage).filter(Boolean))].sort((a,b)=>parseInt(a.match(/\d+/)||0)-parseInt(b.match(/\d+/)||0));
+            const vMap = new Map();
+            allData.filter(d => d.subdistrict === s && d.village).forEach(d => {
+                let mooNum = parseInt(String(d.moo || d.village.match(/\d+/)?.[0] || 0));
+                vMap.set(d.village, mooNum);
+            });
+            const vs = Array.from(vMap.keys()).sort((a,b) => vMap.get(a) - vMap.get(b));
             vSel.innerHTML='<option value="">- เลือกหมู่บ้าน -</option>' + vs.map(v=>`<option value="${v}">${v}</option>`).join('');
         }
 
@@ -639,36 +657,29 @@
                 showBase = true;
                 const bs = document.getElementById(baseSubId).value;
                 const bv = document.getElementById(baseVilId).value;
-                pool = (bs && bv) ? pool.filter(x => x.subdistrict === bs && x.rawVillage === bv) : [];
+                pool = (bs && bv) ? pool.filter(x => x.subdistrict === bs && x.village === bv) : [];
             }
 
             if (mode === 'multi_individual' || mode.includes('except')) {
-                items = pool.map(o => ({ 
-                    id: o.idCard, 
-                    label: o.fullName, 
-                    sub: `${o.position} ต.${o.subdistrict}`,
-                    // 2.3 Sort targets -> add sort keys
-                    subdistrict: o.subdistrict,
-                    rawVillage: o.rawVillage
-                }));
+                items = pool.map(o => ({ id: o.idCard, label: o.fullName, sub: `${o.position} ต.${o.subdistrict}`, subdistrict: o.subdistrict, moo: o.moo }));
             } else if (mode === 'multi_village') {
                 const vMap = new Map();
-                pool.forEach(o => vMap.set(`${o.subdistrict}|${o.rawVillage}`, { label: `${o.village} (ต.${o.subdistrict})`, subdistrict: o.subdistrict, rawVillage: o.rawVillage }));
-                for (let [k, v] of vMap) items.push({ id: k, label: v.label, sub: '', subdistrict: v.subdistrict, rawVillage: v.rawVillage });
+                pool.forEach(o => vMap.set(`${o.subdistrict}|${o.village}`, { label: `${o.village} (ต.${o.subdistrict})`, subdistrict: o.subdistrict, moo: o.moo }));
+                for (let [k, v] of vMap) items.push({ id: k, label: v.label, sub: '', subdistrict: v.subdistrict, moo: v.moo });
             } else if (mode === 'multi_tambon') {
                 const sSet = new Set(pool.map(o => o.subdistrict));
-                sSet.forEach(s => items.push({ id: s, label: `ตำบล${s}`, sub: '', subdistrict: s, rawVillage: '' }));
+                sSet.forEach(s => items.push({ id: s, label: `ตำบล${s}`, sub: '', subdistrict: s, moo: 0 }));
             } else if (mode === 'all') {
                 showCheck = false;
             }
 
-            // 2.3 Sort targets logic
+            // เรียงลำดับ ตำบล -> หมู่บ้าน -> ชื่อ
             items.sort((a, b) => {
-                if (a.subdistrict !== b.subdistrict) return a.subdistrict.localeCompare(b.subdistrict, 'th');
-                let mooA = parseInt(a.rawVillage?.match(/\d+/)?.[0] || 0);
-                let mooB = parseInt(b.rawVillage?.match(/\d+/)?.[0] || 0);
+                if (a.subdistrict !== b.subdistrict) return (a.subdistrict || '').localeCompare(b.subdistrict || '', 'th');
+                let mooA = parseInt(a.moo || 0);
+                let mooB = parseInt(b.moo || 0);
                 if (mooA !== mooB) return mooA - mooB;
-                return a.label.localeCompare(b.label, 'th');
+                return (a.label || '').localeCompare(b.label || '', 'th');
             });
 
             return { items: items.filter(i => i.label.toLowerCase().includes(txt) || i.sub.toLowerCase().includes(txt)), showBase, showCheck };
@@ -723,9 +734,8 @@
             }
         }
 
-        // --- STREAMING_CHUNK:SCORING ADMIN & 1. DISTRIBUTION LOGIC ---
+        // --- STREAMING_CHUNK:SCORING ADMIN & DISTRIBUTION LOGIC RESTORED ---
         
-        // ฟังก์ชันดึงคะแนนรายบุคคลจากฐานข้อมูลมาจำลองเพื่อดูว่าเต็มหรือยัง
         async function getScoresMapObj() {
             const logsSnap = await db.collection(`${basePath}/score_logs`).get();
             let map = {};
@@ -735,22 +745,23 @@
                 if (!map[id]) { map[id] = {}; CRITERIA_LIST.forEach(c => map[id][c.id] = 0); }
                 let cat = l.categoryId;
                 let sc = Number(l.score) || 0;
-                if (l.type === 'negative') sc = -Math.abs(sc);
+                if (l.type === 'negative' || l.scoreType === 'negative') sc = -Math.abs(sc);
                 else sc = Math.abs(sc);
                 if (map[id][cat] !== undefined) map[id][cat] += sc;
             });
             return map;
         }
 
-        // 1. ฟังก์ชันกระจายคะแนน (Breakdowns Logic)
+        // ฟังก์ชันกระจายคะแนน
         function calculateDistribution(targetId, requestedCatId, scoreToAdd, type, currentScoresMap) {
             let pScores = currentScoresMap[targetId];
             if (!pScores) { pScores = {}; CRITERIA_LIST.forEach(c => pScores[c.id] = 0); }
-            
+
             let remaining = Math.abs(scoreToAdd);
             let results = [];
-            
-            if (type === 'negative') {
+
+            if (type === 'negative' || type === 'NEGATIVE') {
+                // หักจากหมวดที่ร้องขอก่อน
                 let reqCur = pScores[requestedCatId] || 0;
                 if (reqCur > 0) {
                     let deduct = Math.min(remaining, reqCur);
@@ -758,6 +769,7 @@
                     remaining -= deduct;
                     pScores[requestedCatId] -= deduct;
                 }
+                // ถ้ายังเหลือ ให้ไปหักจากหมวดอื่น
                 if (remaining > 0) {
                     for (let i = 0; i < CRITERIA_LIST.length; i++) {
                         let cat = CRITERIA_LIST[i].id;
@@ -772,23 +784,23 @@
                         }
                     }
                 }
+                // ถ้ายังเหลืออีก (หักจนหมดตัว) บังคับหักหมวดเดิมไปเลย
                 if (remaining > 0) {
                     results.push({ catId: requestedCatId, score: remaining });
                     pScores[requestedCatId] -= remaining;
                 }
-                return results;
             } else {
-                if (CRITERIA[requestedCatId]) {
-                    let reqMax = CRITERIA[requestedCatId].max;
-                    let reqCur = pScores[requestedCatId] || 0;
-                    let availReq = reqMax - reqCur;
-                    if (availReq > 0) {
-                        let allocate = Math.min(remaining, availReq);
-                        results.push({ catId: requestedCatId, score: allocate });
-                        remaining -= allocate;
-                        pScores[requestedCatId] += allocate;
-                    }
+                // บวกคะแนนเข้าหมวดที่ร้องขอก่อน (เช็กเพดาน)
+                let reqMax = CRITERIA[requestedCatId] ? CRITERIA[requestedCatId].max : 999;
+                let reqCur = pScores[requestedCatId] || 0;
+                let availReq = reqMax - reqCur;
+                if (availReq > 0) {
+                    let allocate = Math.min(remaining, availReq);
+                    results.push({ catId: requestedCatId, score: allocate });
+                    remaining -= allocate;
+                    pScores[requestedCatId] += allocate;
                 }
+                // ถ้ายังเหลือ ให้กระจายไปหมวดอื่นที่ยังไม่เต็มเพดาน
                 if (remaining > 0) {
                     for (let i = 0; i < CRITERIA_LIST.length; i++) {
                         let cat = CRITERIA_LIST[i].id;
@@ -805,12 +817,13 @@
                         }
                     }
                 }
+                // ถ้ายังเหลืออีก (เต็มทุกหมวด) บังคับยัดลงหมวดเดิม
                 if (remaining > 0) {
                     results.push({ catId: requestedCatId, score: remaining });
                     pScores[requestedCatId] += remaining;
                 }
-                return results;
             }
+            return results;
         }
 
         function openScoreModal() {
@@ -849,7 +862,6 @@
         function removeActivityRow(id) { actRows = actRows.filter(r => r.id !== id); renderActs(); }
         function updAct(id,f,v) { const r=actRows.find(x=>x.id===id); if(r) r[f]=v; }
 
-        // 1. นำระบบกระจายคะแนน (Breakdowns) ไปใช้ตอนบันทึก (submitBatch)
         async function submitBatch() {
             const mode = document.getElementById('targetMode').value;
             const sels = Array.from(globalSelections);
@@ -857,19 +869,19 @@
 
             let targets = [];
             if (mode === 'multi_individual') targets = allData.filter(o => sels.includes(o.idCard));
-            else if (mode === 'multi_village') targets = allData.filter(o => sels.includes(o.subdistrict + '|' + o.rawVillage));
+            else if (mode === 'multi_village') targets = allData.filter(o => sels.includes(o.subdistrict + '|' + o.village));
             else if (mode === 'multi_tambon') targets = allData.filter(o => sels.includes(o.subdistrict));
             else if (mode === 'all') targets = allData;
             else if (mode === 'all_except') targets = allData.filter(o => !sels.includes(o.idCard));
             else if (mode === 'tambon_except') targets = allData.filter(o => o.subdistrict === document.getElementById('baseSub').value && !sels.includes(o.idCard));
-            else if (mode === 'village_except') targets = allData.filter(o => o.subdistrict === document.getElementById('baseSub').value && o.rawVillage === document.getElementById('baseVil').value && !sels.includes(o.idCard));
+            else if (mode === 'village_except') targets = allData.filter(o => o.subdistrict === document.getElementById('baseSub').value && o.village === document.getElementById('baseVil').value && !sels.includes(o.idCard));
 
             if(!targets.length) return Swal.fire('เตือน','ไม่พบเป้าหมาย','warning');
 
             setLoad(true, "กำลังบันทึกคะแนน... (และอัปโหลดไฟล์)");
             
             try {
-                // ดึงคะแนนปัจจุบันทั้งหมดมาจำลองก่อน
+                // โหลดคะแนนปัจจุบันเพื่อเช็กเพดาน (Breakdowns)
                 const currentScoresMap = await getScoresMapObj();
                 let updates = {};
                 targets.forEach(t => updates[t.idCard] = t.totalScore || 0);
@@ -888,9 +900,8 @@
                     const batch = db.batch();
                     
                     for (let p of targets) {
-                        // 1. คำนวณกระจายคะแนน
+                        // กระจายคะแนน
                         let distList = calculateDistribution(p.idCard, act.cat, Number(act.score), act.type, currentScoresMap);
-                        
                         let totalActScoreForThisPerson = 0;
                         
                         for (let dist of distList) {
@@ -902,7 +913,7 @@
                             batch.set(logRef, {
                                 idCard: p.idCard,
                                 fullName: p.fullName,
-                                categoryId: dist.catId,  // ใช้หมวดหมู่ที่ถูกกระจายแล้ว
+                                categoryId: dist.catId, // หมวดที่กระจายแล้ว
                                 activityName: act.name,
                                 activityDetail: '',
                                 score: sc,
@@ -914,7 +925,7 @@
                             });
                         }
 
-                        // อัปเดตคะแนนรวมของคนนี้
+                        // อัปเดตคะแนนรวม
                         updates[p.idCard] += totalActScoreForThisPerson;
                         const offRef = db.collection(`${basePath}/officials`).doc(p.docId || p.idCard);
                         batch.update(offRef, {
@@ -935,7 +946,7 @@
             }
         }
 
-        // --- STREAMING_CHUNK:HISTORY & EXPORT ---
+        // --- STREAMING_CHUNK:EDIT HISTORY & EXPORT (Firebase) ---
         function viewUserHistory() {
             manageHistory(curUser.username, curUser.name);
         }
@@ -988,17 +999,15 @@
                 let logsArr = [];
                 logsSnap.docs.forEach(doc => logsArr.push({id: doc.id, ...doc.data()}));
                 
-                // จัดกลุ่มคะแนนและ Breakdowns
                 let grouped = {};
                 let order = [];
                 
                 logsArr.forEach(l => {
                     let dateKey = l.dateStr || '';
                     let sortTime = parseDateForSort(dateKey);
-                    // 1. เพิ่ม ID ก้อนใน key ด้วยถ้าจำเป็น, แต่มักจะจัดกลุ่มตามชื่อกิจกรรมและวันที่
-                    let key = dateKey + '_' + l.activityName; 
+                    let key = dateKey + '_' + l.activityName;
                     let rawSc = Number(l.score) || 0;
-                    let actualScore = l.type === 'negative' ? -Math.abs(rawSc) : Math.abs(rawSc);
+                    let actualScore = (l.type === 'negative' || l.scoreType === 'negative') ? -Math.abs(rawSc) : Math.abs(rawSc);
                     let catName = CRITERIA[l.categoryId] ? CRITERIA[l.categoryId].name : l.categoryId;
                     
                     if (!grouped[key]) {
@@ -1010,10 +1019,10 @@
                             activityName: l.activityName, 
                             activityDetail: l.activityDetail || '',
                             rawScore: actualScore, 
-                            type: l.type,
-                            recordedBy: l.recordedBy,
+                            type: l.type || l.scoreType,
+                            recordedBy: l.recordedBy || l.adminName,
                             proof: l.proofUrl || l.ProofLink || '',
-                            breakdowns: [{ name: catName, score: actualScore }] 
+                            breakdowns: [{ name: catName, score: actualScore }] // เก็บป้ายคะแนนย่อย
                         };
                         order.push(key);
                     } else {
@@ -1025,7 +1034,7 @@
                 });
 
                 let finalHistory = order.map(k => grouped[k]);
-                finalHistory.sort((a, b) => b.sortTime - a.sortTime); // ล่าสุดอยู่บน
+                finalHistory.sort((a, b) => b.sortTime - a.sortTime); 
                 
                 finalHistory.forEach(l => {
                     let logId = l.ids[0]; 
@@ -1034,34 +1043,28 @@
                     let scoreDisplay = (isNegative ? '' : '+') + l.rawScore;
                     let scoreHtml = `<span class="${!isNegative ? 'text-green-600' : 'text-red-600'}">${scoreDisplay}</span>`;
                     
-                    // 1. สร้างป้ายคะแนนย่อย (Breakdowns) ในหน้า Admin
+                    // ป้าย Breakdowns
                     let breakdownHtml = l.breakdowns.map(b => 
                         `<span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[10px] mr-1 mt-1 border border-indigo-100 inline-block">${b.name} (${b.score > 0 ? '+' : ''}${b.score})</span>`
                     ).join('');
                     
-                    // 3. ย้ายปุ่มทั้งหมดมาไว้ใต้ชื่อกิจกรรม
                     let proofLink = l.proof ? l.proof : '';
-                    let actionHtml = '';
+                    let proofBtn = proofLink ? `<a href="${proofLink}" target="_blank" class="text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-100 whitespace-nowrap inline-flex items-center w-full md:w-auto justify-center mt-2 md:mt-0 md:mr-2"><i class="fa-solid fa-paperclip mr-1"></i> ดูไฟล์หลักฐาน</a>` : '';
                     
-                    if (proofLink) {
-                        actionHtml += `<a href="${proofLink}" target="_blank" class="text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-100 whitespace-nowrap inline-flex items-center mt-2 mr-2"><i class="fa-solid fa-paperclip mr-1"></i> ดูไฟล์หลักฐาน</a>`;
-                    }
+                    let actionBtns = proofBtn;
                     
                     if(curUser.role==='user' && isNegative) {
                         if (appealedLogIds.has(logId)) {
-                            actionHtml += `<div class="mt-2 text-[10px] bg-slate-100 text-slate-500 px-3 py-1.5 rounded-lg font-bold inline-block border border-slate-200">ยื่นอุทธรณ์แล้ว</div>`;
+                            actionBtns += `<div class="mt-2 md:mt-0 text-[10px] bg-slate-100 text-slate-500 px-3 py-1.5 rounded-lg font-bold inline-block border border-slate-200">ยื่นอุทธรณ์แล้ว</div>`;
                         } else {
-                            actionHtml += `<button onclick="openAppeal('${l.primaryCatId}', '${l.activityName}', ${l.rawScore}, '${l.ids.join(',')}')" class="mt-2 text-[10px] bg-orange-500 text-white px-3 py-1.5 rounded-lg font-bold shadow-sm hover:bg-orange-600 inline-block">ยื่นอุทธรณ์</button>`;
+                            actionBtns += `<button onclick="openAppeal('${l.primaryCatId}', '${l.activityName}', ${l.rawScore}, '${l.ids.join(',')}')" class="mt-2 md:mt-0 text-[10px] bg-orange-500 text-white px-3 py-1.5 rounded-lg font-bold shadow-sm hover:bg-orange-600 inline-block">ยื่นอุทธรณ์</button>`;
                         }
                     } else if (curUser.role === 'district') {
                         let idsParam = l.ids.join(',');
-                        actionHtml += `
-                            <button onclick="openEditLog('${logId}', '${idCard}', '${l.primaryCatId}', '${l.activityName}', '${l.activityDetail}', ${l.rawScore})" class="mt-2 mr-2 bg-amber-50 text-amber-600 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-amber-100 inline-flex items-center"><i class="fa-solid fa-pen mr-1"></i> แก้ไข</button>
-                            <button onclick="deleteLogGroup('${idsParam}', '${idCard}')" class="mt-2 bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-red-100 inline-flex items-center"><i class="fa-solid fa-trash mr-1"></i> ลบ</button>
-                        `;
+                        actionBtns += `<button onclick="openEditLog('${logId}', '${idCard}', '${l.primaryCatId}', '${l.activityName}', '${l.activityDetail}', ${l.rawScore})" class="mt-2 md:mt-0 mr-2 bg-amber-50 text-amber-600 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-amber-100 inline-flex items-center"><i class="fa-solid fa-pen mr-1"></i> แก้ไข</button>`;
+                        actionBtns += `<button onclick="deleteLogGroup('${idsParam}', '${idCard}')" class="mt-2 md:mt-0 bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-red-100 inline-flex items-center"><i class="fa-solid fa-trash mr-1"></i> ลบ</button>`;
                     }
 
-                    // 3. เอาคอลัมน์ขวาสุดออก
                     tb.innerHTML += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition">
                         <td class="p-3 md:p-4 text-[10px] md:text-xs text-slate-500 font-mono align-top pt-4 md:pt-5 text-center">${dateDisplay}</td>
                         <td class="p-3 md:p-4 text-sm align-top">
@@ -1069,7 +1072,8 @@
                             <div class="mb-1.5">${breakdownHtml}</div>
                             <div class="text-xs text-slate-600 mt-1 whitespace-pre-wrap">${l.activityDetail}</div>
                             <div class="text-[10px] text-slate-400 mt-2"><i class="fa-solid fa-user-pen"></i> ผู้บันทึก: ${l.recordedBy || '-'}</div>
-                            <div class="mt-3 w-full border-t border-slate-100 pt-2">${actionHtml}</div>
+                            <!-- ย้ายปุ่มทั้งหมดมาไว้ใต้ชื่อกิจกรรม -->
+                            <div class="mt-3 w-full border-t border-slate-100 pt-2 flex flex-col md:flex-row md:items-center">${actionBtns}</div>
                         </td>
                         <td class="p-3 md:p-4 text-center font-bold text-lg md:text-xl align-top pt-4 md:pt-5">${scoreHtml}</td>
                     </tr>`;
@@ -1084,7 +1088,7 @@
             let newTotal = 0;
             logsSnap.forEach(doc => {
                 let d = doc.data();
-                if (d.type === 'negative') newTotal -= Math.abs(d.score);
+                if (d.type === 'negative' || d.scoreType === 'negative') newTotal -= Math.abs(d.score);
                 else newTotal += Math.abs(d.score);
             });
             await db.collection(`${basePath}/officials`).doc(idCard).update({ totalScore: newTotal });
@@ -1112,7 +1116,7 @@
         }
         
         function openEditLog(logId, idCard, catId, actName, actDetail, score) {
-            document.getElementById('editLogIndex').value = logId; // ใช้เก็บ Doc ID แทน Index
+            document.getElementById('editLogIndex').value = logId; 
             document.getElementById('editLogIdCard').value = idCard;
             
             let opts = ''; criteria.forEach(c => opts += `<option value="${c.id}">${c.name}</option>`);
@@ -1164,7 +1168,7 @@
                         let cat = String(l.categoryId);
                         let actName = String(l.activityName);
                         let score = Number(l.score) || 0;
-                        if(l.type === 'negative') score = -Math.abs(score);
+                        if(l.type === 'negative' || l.scoreType === 'negative') score = -Math.abs(score);
                         else score = Math.abs(score);
                         
                         if(!userScores[cat]) userScores[cat] = 0;
@@ -1244,12 +1248,12 @@
             
             setLoad(true, "กำลังส่งข้อมูลเข้าสู่ระบบ...");
             try {
-                let fileUrl = reqLink; // ใช้ลิงก์เป็นค่าเริ่มต้นถ้ามี
+                let fileUrl = reqLink; 
                 if (file) {
                     const ext = file.name.split('.').pop();
                     const ref = storage.ref(`evidence/${curUser.username}/${Date.now()}_document.${ext}`);
                     await ref.put(file);
-                    fileUrl = await ref.getDownloadURL(); // ถ้ามีไฟล์ จะทับลิงก์ไปเลย
+                    fileUrl = await ref.getDownloadURL(); 
                 }
 
                 await db.collection(`${basePath}/requests`).add({
@@ -1278,13 +1282,10 @@
                 const reqsSnap = await db.collection(`${basePath}/requests`).orderBy('timestamp', 'desc').get();
                 let reqs = reqsSnap.docs.map(d => ({ docId: d.id, ...d.data() }));
 
-                // ตัวกรองตาม Role (อำเภอ/ตำบล)
                 if (curUser.role === 'tambon') {
-                    // ตำบลเห็นเฉพาะคนในตำบลตัวเอง และเป็น Pending ของตำบล
                     const myTambonIds = allData.filter(o => o.subdistrict === curUser.filter).map(o => o.idCard);
                     reqs = reqs.filter(r => myTambonIds.includes(r.officialId) && r.statTam === 'Pending');
                 } else if (curUser.role === 'district') {
-                    // อำเภอเห็นเฉพาะที่ส่งมาจากตำบล (Forwarded) และรออำเภอ (Pending)
                     reqs = reqs.filter(r => r.statTam === 'Forwarded' && r.statDist === 'Pending');
                 }
 
@@ -1420,7 +1421,6 @@
             }
         }
 
-        // 1. นำระบบกระจายคะแนน (Breakdowns) ไปใช้ตอนอนุมัติอุทธรณ์/คำร้อง
         async function approveAction(reqDocId, role, action, score, idCard='', origCatId='', origActName='', origActDetail='', type='', refLogIds='') {
             let finalScore = score;
             let finalCat = origCatId;
@@ -1445,8 +1445,8 @@
                 const reqRef = db.collection(`${basePath}/requests`).doc(reqDocId);
                 const reqSnap = await reqRef.get();
                 let reqData = reqSnap.data();
-
-                const currentScoresMap = await getScoresMapObj(); // ดึงคะแนนปัจจุบันเพื่อเช็กเพดาน
+                
+                const currentScoresMap = await getScoresMapObj();
 
                 if (type === 'APPEAL') {
                     if (action === 'ConfirmDeduction') {
@@ -1458,13 +1458,10 @@
                         if (role === 'tambon') await reqRef.update({ statTam: 'Approved', statDist: 'Auto-Approved' });
                         else await reqRef.update({ statDist: 'Approved' });
 
-                        // ลบ log ก้อนเก่าทิ้ง
                         if (refLogIds) {
                             const ids = refLogIds.split(',');
                             const batch = db.batch();
-                            ids.forEach(id => {
-                                batch.delete(db.collection(`${basePath}/score_logs`).doc(id));
-                            });
+                            ids.forEach(id => { batch.delete(db.collection(`${basePath}/score_logs`).doc(id)); });
                             await batch.commit();
                         }
 
@@ -1475,7 +1472,6 @@
                                 let logType = parseFloat(finalScore) >= 0 ? 'positive' : 'negative';
                                 let actTitle = finalActName.includes('(อุทธรณ์)') ? finalActName : finalActName + ' (อุทธรณ์)';
                                 
-                                // 1. กระจายคะแนนตอนอนุมัติอุทธรณ์
                                 let distList = calculateDistribution(idCard, finalCat, val, logType, currentScoresMap);
                                 const batch = db.batch();
                                 for (let dist of distList) {
@@ -1484,8 +1480,7 @@
                                         idCard: idCard, fullName: person.fullName, categoryId: dist.catId,
                                         activityName: actTitle, activityDetail: finalActDetail, score: Math.abs(dist.score),
                                         type: logType, recordedBy: curUser.name, proofUrl: reqData.fileUrl || '',
-                                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                                        dateStr: new Date().toLocaleDateString('th-TH')
+                                        timestamp: firebase.firestore.FieldValue.serverTimestamp(), dateStr: new Date().toLocaleDateString('th-TH')
                                     });
                                 }
                                 await batch.commit();
@@ -1494,14 +1489,12 @@
                         await recalculateScore(idCard);
                     }
                 } else {
-                    // REQUEST
                     if (action === 'Approved') {
                         if (role === 'tambon') await reqRef.update({ statTam: 'Approved', statDist: 'Auto-Approved', approvedScore: finalScore });
                         else await reqRef.update({ categoryId: finalCat, activityName: finalActName, detail: finalActDetail, statDist: 'Approved', approvedScore: finalScore });
                         
                         const person = allData.find(x => x.idCard === idCard);
                         if (person) {
-                            // 1. กระจายคะแนนตอนอนุมัติผลงาน
                             let distList = calculateDistribution(idCard, finalCat, Math.abs(parseFloat(finalScore)), 'positive', currentScoresMap);
                             const batch = db.batch();
                             for (let dist of distList) {
@@ -1629,12 +1622,10 @@
                     setLoad(true, "กำลังล้างข้อมูล...");
                     try {
                         for(let p of targets) {
-                            // ลบ log ของคนนี้
                             const lSnap = await db.collection(`${basePath}/score_logs`).where('idCard', '==', p.idCard).get();
                             const batch = db.batch();
                             lSnap.forEach(doc => batch.delete(doc.ref));
                             await batch.commit();
-                            // รีเซ็ตเป็น 0
                             await db.collection(`${basePath}/officials`).doc(p.docId || p.idCard).update({ totalScore: 0 });
                         }
                         initAdmin(); closeModal('modal-reset'); Swal.fire('สำเร็จ', `ล้างข้อมูล ${targets.length} รายการสำเร็จ`, 'success'); 
@@ -1645,7 +1636,6 @@
             });
         }
 
-        // ฟังก์ชันแก้ไขรายชื่อบุคคล
         function openEditOff(idCard) {
             const person = allData.find(x => x.idCard === idCard);
             if(!person) return;
@@ -1682,7 +1672,7 @@
             document.getElementById('editOffId').value = person.idCard;
             document.getElementById('editOffName').value = person.fullName;
             document.getElementById('editOffPos').value = person.position;
-            document.getElementById('editOffMoo').value = person.moo;
+            document.getElementById('editOffMoo').value = person.moo || '';
             document.getElementById('editOffVil').value = person.rawVillage;
             document.getElementById('editOffSub').value = person.subdistrict;
             
