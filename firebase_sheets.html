@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Firebase Sheets V24 - Editable Data Retainer</title>
+    <title>Firebase Sheets V25 - Editable Data Retainer</title>
     
     <link rel="icon" href="DOPA_NASAN_Score_App_Icons/favicon.ico" sizes="any">
     <link rel="icon" type="image/png" sizes="32x32" href="DOPA_NASAN_Score_App_Icons/favicon-32.png">
@@ -75,7 +75,7 @@
                     { key: 'proofUrl', label: 'หลักฐาน' }
                 ]
             },
-            requests_appeals: {
+            requests: {
                 docIdField: 'ReqID',
                 cols: [
                     { key: 'ReqID', label: 'ReqID' },
@@ -120,8 +120,8 @@
                 querySnapshot.forEach((document) => {
                     let data = document.data();
                     
-                    // V25 Fix: สำหรับตาราง requests_appeals พยายามดึงคีย์ต่างๆ ที่อาจจะเพี้ยนจาก Excel
-                    if (currentTable === 'requests_appeals') {
+                    // V25 Fix: สำหรับตาราง requests พยายามดึงคีย์ต่างๆ ที่อาจจะเพี้ยนจาก Excel หรือ App
+                    if (currentTable === 'requests') {
                         data.ReqID = data.ReqID || data.reqId || document.id;
                         data.Type = data.Type || data.type || '';
                         data.ID_Card = data.ID_Card || data.idCard || data.officialId || '';
@@ -218,7 +218,7 @@
                 if (currentTable === 'officials') targetSheetKeywords = ['bookkon', 'บุคลากร', 'official'];
                 else if (currentTable === 'score_logs') targetSheetKeywords = ['score', 'log', 'ประวัติ'];
                 else if (currentTable === 'users_config') targetSheetKeywords = ['user', 'config', 'ผู้ดูแล'];
-                else if (currentTable === 'requests_appeals') targetSheetKeywords = ['request', 'appeal', 'คำร้อง'];
+                else if (currentTable === 'requests') targetSheetKeywords = ['request', 'appeal', 'คำร้อง'];
 
                 let sheetMatch = null;
                 for (let sheetName of workbook.SheetNames) {
@@ -333,7 +333,7 @@
                         newObj.name = n; newObj.DisplayName = n;
                         added++;
                     }
-                    else if (currentTable === 'requests_appeals') {
+                    else if (currentTable === 'requests') {
                         let idKey = Object.keys(row).find(k => k.toLowerCase().includes('req'));
                         if (!idKey || !row[idKey]) return;
                         
@@ -506,7 +506,8 @@
             <option value="users_config">⚙️ ผู้ดูแลระบบ (users_config)</option>
             <option value="officials">👥 บุคลากร (officials)</option>
             <option value="score_logs">⭐ ประวัติคะแนน (score_logs)</option>
-            <option value="requests_appeals">📝 คำร้องอุทธรณ์ (requests_appeals)</option>
+            <!-- แก้ไข Value ให้ชี้ไปที่ requests ตามที่ระบบหลักใช้งาน -->
+            <option value="requests">📝 คำร้องอุทธรณ์ (requests)</option>
         </select>
         
         <button onclick="clearOldData()" class="bg-red-50 text-red-600 px-3 py-2 rounded-lg text-xs font-bold border border-red-200 hover:bg-red-100"><i class="fa-solid fa-trash-can"></i> ล้างข้อมูลเก่าก่อน</button>
