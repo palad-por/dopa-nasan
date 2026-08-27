@@ -657,14 +657,15 @@
                 showBase = true;
                 const bs = document.getElementById(baseSubId).value;
                 const bv = document.getElementById(baseVilId).value;
-                pool = (bs && bv) ? pool.filter(x => x.subdistrict === bs && x.village === bv) : [];
+                pool = (bs && bv) ? pool.filter(x => x.subdistrict === bs && x.rawVillage === bv) : [];
             }
 
             if (mode === 'multi_individual' || mode.includes('except')) {
-                items = pool.map(o => ({ id: o.idCard, label: o.fullName, sub: `${o.position} ต.${o.subdistrict}`, subdistrict: o.subdistrict, moo: o.moo }));
+                // V25 Fix: เพิ่มหมู่ที่เข้าไปในการแสดงผล
+                items = pool.map(o => ({ id: o.idCard, label: o.fullName, sub: `${o.position} ต.${o.subdistrict} ม.${o.moo || '-'}`, subdistrict: o.subdistrict, moo: o.moo }));
             } else if (mode === 'multi_village') {
                 const vMap = new Map();
-                pool.forEach(o => vMap.set(`${o.subdistrict}|${o.village}`, { label: `${o.village} (ต.${o.subdistrict})`, subdistrict: o.subdistrict, moo: o.moo }));
+                pool.forEach(o => vMap.set(`${o.subdistrict}|${o.rawVillage}`, { label: `${o.village} (ต.${o.subdistrict})`, subdistrict: o.subdistrict, moo: o.moo }));
                 for (let [k, v] of vMap) items.push({ id: k, label: v.label, sub: '', subdistrict: v.subdistrict, moo: v.moo });
             } else if (mode === 'multi_tambon') {
                 const sSet = new Set(pool.map(o => o.subdistrict));
@@ -673,7 +674,7 @@
                 showCheck = false;
             }
 
-            // เรียงลำดับ ตำบล -> หมู่บ้าน -> ชื่อ
+            // V25 Fix: เรียงลำดับ ตำบล -> หมู่บ้าน -> ชื่อ (ใช้ตรรกะเดียวกับ index.html)
             items.sort((a, b) => {
                 if (a.subdistrict !== b.subdistrict) return (a.subdistrict || '').localeCompare(b.subdistrict || '', 'th');
                 let mooA = parseInt(a.moo || 0);
