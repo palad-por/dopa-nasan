@@ -667,7 +667,8 @@
                 showBase = true;
                 const bs = document.getElementById(baseSubId).value;
                 const bv = document.getElementById(baseVilId).value;
-                pool = (bs && bv) ? pool.filter(x => x.subdistrict === bs && x.rawVillage === bv) : [];
+                // แก้ไขการเทียบหมู่บ้าน ให้ใช้ x.village แทน x.rawVillage เพื่อให้ตรงกับตัวเลือกใน Dropdown
+                pool = (bs && bv) ? pool.filter(x => x.subdistrict === bs && x.village === bv) : [];
             }
 
             if (mode === 'multi_individual' || mode.includes('except')) {
@@ -871,12 +872,13 @@
 
             let targets = [];
             if (mode === 'multi_individual') targets = allData.filter(o => sels.includes(o.idCard));
-            else if (mode === 'multi_village') targets = allData.filter(o => sels.includes(o.subdistrict + '|' + o.rawVillage));
+            else if (mode === 'multi_village') targets = allData.filter(o => sels.includes(o.subdistrict + '|' + o.village));
             else if (mode === 'multi_tambon') targets = allData.filter(o => sels.includes(o.subdistrict));
             else if (mode === 'all') targets = allData;
             else if (mode === 'all_except') targets = allData.filter(o => !sels.includes(o.idCard));
             else if (mode === 'tambon_except') targets = allData.filter(o => o.subdistrict === document.getElementById('baseSub').value && !sels.includes(o.idCard));
-            else if (mode === 'village_except') targets = allData.filter(o => o.subdistrict === document.getElementById('baseSub').value && o.rawVillage === document.getElementById('baseVil').value && !sels.includes(o.idCard));
+            // แก้ไขการเทียบหมู่บ้าน ให้ใช้ o.village แทน o.rawVillage เพื่อให้ตรงกับตัวเลือกใน Dropdown
+            else if (mode === 'village_except') targets = allData.filter(o => o.subdistrict === document.getElementById('baseSub').value && o.village === document.getElementById('baseVil').value && !sels.includes(o.idCard));
 
             if(!targets.length) return Swal.fire('เตือน','ไม่พบเป้าหมาย','warning');
 
@@ -1612,7 +1614,8 @@
             else if (mode === 'all') targets = allData;
             else if (mode === 'all_except') targets = allData.filter(o => !sels.includes(o.idCard));
             else if (mode === 'tambon_except') targets = allData.filter(o => o.subdistrict === document.getElementById('resetTargetBaseSub').value && !sels.includes(o.idCard));
-            else if (mode === 'village_except') targets = allData.filter(o => o.subdistrict === document.getElementById('resetTargetBaseSub').value && o.rawVillage === document.getElementById('resetTargetBaseVil').value && !sels.includes(o.idCard));
+            // แก้ไขการเทียบหมู่บ้าน ให้ใช้ o.village แทน o.rawVillage เพื่อให้ตรงกับตัวเลือกใน Dropdown
+            else if (mode === 'village_except') targets = allData.filter(o => o.subdistrict === document.getElementById('resetTargetBaseSub').value && o.village === document.getElementById('resetTargetBaseVil').value && !sels.includes(o.idCard));
 
             Swal.fire({title:'ยืนยันล้างข้อมูลเป็น 0 ?', text:'ประวัติและคะแนนจะถูกลบ ไม่สามารถกู้คืนได้', icon:'warning', showCancelButton:true, confirmButtonColor:'#dc2626'}).then(async r => {
                 if(r.isConfirmed){
