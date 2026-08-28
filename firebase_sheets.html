@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -109,6 +110,31 @@
             const searchInput = document.getElementById('searchInput');
             if (searchInput) searchInput.value = '';
             fetchDataFromFirebase();
+        }
+
+        // ฟังก์ชันสำหรับเพิ่มแถวใหม่แบบแมนนวล
+        window.addNewRow = function() {
+            const schema = schemas[currentTable];
+            let newRow = { _isDirty: true }; // กำหนดให้เป็นสถานะแก้ไข (สีเหลือง)
+            
+            // สร้าง properties ตาม schema เริ่มต้นด้วยค่าว่าง
+            schema.cols.forEach(c => {
+                newRow[c.key] = c.isNumber ? 0 : '';
+            });
+
+            // ดันแถวใหม่ไปไว้ข้างหน้าสุด (เพื่อให้เห็นชัดเจน)
+            tableData.unshift(newRow);
+            
+            // แสดงปุ่มบันทึก
+            isEditingMode = true; 
+            document.getElementById('saveBtn').style.display = 'block'; 
+            document.getElementById('saveBtn').innerHTML = '<i class="fa-solid fa-save"></i> บันทึกการแก้ไข (Update)';
+            
+            // ล้างช่องค้นหาเพื่อให้เห็นแถวใหม่แน่นอน
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) searchInput.value = '';
+
+            renderTable();
         }
 
         window.fetchDataFromFirebase = async function() {
@@ -526,7 +552,7 @@
         .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     </style>
 </head>
-<body>
+<body class="flex flex-col h-screen overflow-hidden">
 
     <header class="bg-indigo-700 text-white p-3 flex justify-between items-center flex-none shadow-md">
         <div class="flex items-center gap-3">
@@ -553,14 +579,25 @@
         <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleExcelUpload(event)">
         <button onclick="triggerExcelUpload()" class="bg-emerald-100 text-emerald-800 px-3 py-2 rounded-lg text-xs font-bold border border-emerald-300 hover:bg-emerald-200"><i class="fa-solid fa-file-excel"></i> นำเข้าไฟล์ Excel ใหม่</button>
 
+        <!-- ปุ่มเพิ่มแถวใหม่ -->
+        <button onclick="addNewRow()" class="bg-purple-100 text-purple-800 px-3 py-2 rounded-lg text-xs font-bold border border-purple-300 hover:bg-purple-200 ml-2 shadow-sm"><i class="fa-solid fa-plus"></i> เพิ่มแถวใหม่</button>
+
         <!-- กล่องค้นหา (Search Box) -->
-        <div class="relative w-64 ml-2 border-l pl-4">
+        <div class="relative w-64 ml-2 border-l pl-4 hidden md:block">
             <i class="fa-solid fa-search absolute left-7 top-2.5 text-slate-400 text-sm"></i>
-            <input type="text" id="searchInput" oninput="renderTable()" class="w-full pl-8 p-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 outline-none" placeholder="ค้นหา (ตำบล, หมู่, ชื่อ...)">
+            <input type="text" id="searchInput" oninput="renderTable()" class="w-full pl-8 p-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-slate-50" placeholder="พิมพ์คำค้นหา (ค้นได้ทุกคอลัมน์)...">
         </div>
 
         <div class="flex-grow"></div>
         <button id="saveBtn" style="display:none;" onclick="saveToFirebase()" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md"><i class="fa-solid fa-cloud-arrow-up"></i> บันทึกขึ้น Firebase</button>
+    </div>
+    
+    <!-- กล่องค้นหาสำหรับมือถือ -->
+    <div class="p-2 bg-slate-50 border-b border-slate-200 md:hidden flex-none">
+         <div class="relative w-full">
+            <i class="fa-solid fa-search absolute left-3 top-2.5 text-slate-400 text-sm"></i>
+            <input type="text" id="searchInputMobile" oninput="document.getElementById('searchInput').value=this.value; renderTable();" class="w-full pl-8 p-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-white shadow-sm" placeholder="พิมพ์คำค้นหา (ตำบล, ชื่อ, หมู่)...">
+        </div>
     </div>
 
     <main class="flex-grow overflow-auto bg-slate-100 custom-scroll relative" id="tableWrapper">
