@@ -308,19 +308,20 @@
                     let newObj = {};
                     
                     if (currentTable === 'officials') {
-                        let idKey = Object.keys(row).find(k => k.includes('เลขประจำตัว') || k.includes('ID'));
+                        let idKey = Object.keys(row).find(k => k.includes('เลขประจำตัว') || k.includes('ID') || k.includes('เลข ปชช.'));
                         let nameKey = Object.keys(row).find(k => k.includes('ชื่อ'));
                         
                         if (!idKey || !row[idKey]) return;
                         
                         let idc = String(row[idKey]).replace(/\D/g, '');
                         let fn = String(row[nameKey] || 'ไม่ระบุชื่อ');
-                        let pos = String(row['ตำแหน่ง'] || '-');
-                        let moo = String(row['หมู่ที่'] || '');
-                        let rv = String(row['ชื่อบ้าน'] || '');
-                        let sub = String(row['ตำบล'] || '-');
-                        let vil = (moo && rv) ? `หมู่ที่ ${moo} ${rv}` : '';
-                        let ts = parseFloat(row['คะแนนรวม']) || 0;
+                        let pos = String(row['ตำแหน่ง'] || row['Position'] || '-');
+                        let moo = String(row['หมู่ที่'] || row['หมู่ที่ (เลข)'] || row['Moo'] || '');
+                        let rv = String(row['ชื่อบ้าน'] || row['RawVillage'] || '');
+                        let sub = String(row['ตำบล'] || row['Subdistrict'] || '-');
+                        // หาคอลัมน์หมู่บ้านเต็มเผื่อกรณีโหลด backup กลับมา
+                        let vil = String(row['หมู่บ้านเต็ม'] || row['หมู่บ้าน'] || row['Village'] || ((moo && rv) ? `หมู่ที่ ${moo} ${rv}` : ''));
+                        let ts = parseFloat(row['คะแนนรวม'] || row['TotalScore']) || 0;
 
                         newObj.idCard = idc; newObj.ID_Card = idc;
                         newObj.fullName = fn; newObj.FullName = fn;
@@ -333,10 +334,10 @@
                         added++;
                     } 
                     else if (currentTable === 'score_logs') {
-                        let idKey = Object.keys(row).find(k => k.includes('ID_Card') || k.includes('เลขประจำตัว'));
+                        let idKey = Object.keys(row).find(k => k.includes('ID_Card') || k.includes('เลขประจำตัว') || k.includes('เลข ปชช.'));
                         if (!idKey || !row[idKey]) return;
                         
-                        let dateVal = row['Date'] || row['วันที่'] || row['Timestamp'] || '';
+                        let dateVal = row['วันที่ (Date)'] || row['Date'] || row['วันที่'] || row['Timestamp'] || '';
                         let dStr = '';
                         if (typeof dateVal === 'number') {
                             const dateObj = new Date(Math.round((dateVal - 25569) * 86400 * 1000));
@@ -347,16 +348,16 @@
                             dStr = new Date().toISOString().split('T')[0]; 
                         }
                         
-                        let tStamp = String(row['Timestamp'] || row['Date'] || dStr);
+                        let tStamp = String(row['Timestamp'] || row['วันที่ (Date)'] || row['Date'] || dStr);
                         let idc = String(row[idKey]).replace(/\D/g, '');
                         let fn = String(row['FullName'] || row['ชื่อ-สกุล'] || 'ไม่ระบุชื่อ');
-                        let cat = String(row['Category'] || row['หมวดหมู่'] || '0').trim(); 
-                        let act = String(row['ActivityName'] || row['ชื่อกิจกรรม'] || 'ไม่ระบุกิจกรรม').trim();
+                        let cat = String(row['หมวด'] || row['Category'] || row['หมวดหมู่'] || '0').trim(); 
+                        let act = String(row['กิจกรรม'] || row['ActivityName'] || row['ชื่อกิจกรรม'] || 'ไม่ระบุกิจกรรม').trim();
                         let actd = String(row['ActivityDetail'] || '').trim();
-                        let sc = parseFloat(row['Score'] || row['คะแนน']) || 0;
-                        let ty = String(row['Type'] || row['ประเภท'] || 'positive').trim();
+                        let sc = parseFloat(row['คะแนน'] || row['Score']) || 0;
+                        let ty = String(row['ประเภท (+/-)'] || row['Type'] || row['ประเภท'] || 'positive').trim();
                         let rb = String(row['RecordedBy'] || row['ผู้บันทึก'] || 'System').trim();
-                        let pr = String(row['ProofLink'] || row['หลักฐาน'] || row['proofUrl'] || '').trim();
+                        let pr = String(row['หลักฐาน'] || row['ProofLink'] || row['proofUrl'] || '').trim();
 
                         newObj.dateStr = dStr; newObj.Date = dStr; newObj.date = dStr;
                         newObj.Timestamp = tStamp; newObj.timestamp = tStamp;
@@ -404,9 +405,9 @@
                         let fn = String(row['FullName'] || 'ไม่ระบุชื่อ');
                         let cat = String(row['Category'] || '0');
                         let act = String(row['ActivityName'] || 'ไม่ระบุกิจกรรม');
-                        let reqs = parseFloat(row['RequestedScore']) || 0;
+                        let reqs = parseFloat(row['ReqScore'] || row['RequestedScore']) || 0;
                         let st = String(row['StatusTambon'] || 'Pending');
-                        let sd = String(row['StatusDistrict'] || 'Pending');
+                        let sd = String(row['Status'] || row['StatusDistrict'] || 'Pending');
                         let pr = String(row['ProofLink'] || row['หลักฐาน'] || row['proofUrl'] || '').trim();
 
                         newObj.ReqID = reqId; newObj.reqId = reqId;
