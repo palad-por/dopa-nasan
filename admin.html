@@ -91,6 +91,16 @@
                     </div>
                 </div>
 
+                <div class="district-only mb-4">
+                    <h4 class="font-bold text-slate-600 text-xs uppercase mb-2">ระบบประเมินผลการปฏิบัติงาน</h4>
+                    <div class="space-y-2 bg-blue-50/70 p-3 rounded-2xl border border-blue-100">
+                        <button onclick="openDopaAssessment()" class="w-full bg-blue-700 text-white py-3 rounded-xl text-sm hover:bg-blue-800 transition font-bold flex justify-center items-center gap-2"><i class="fa-solid fa-clipboard-list"></i> DOPA NASAN Score</button>
+                        <button onclick="openDopaImportCenter()" class="w-full bg-white text-blue-800 border border-blue-200 py-2.5 rounded-xl text-sm hover:bg-blue-50 transition font-bold flex justify-center items-center gap-2"><i class="fa-solid fa-cloud-arrow-up"></i> ศูนย์นำเข้าข้อมูล</button>
+                        <button onclick="exportCSVForAssessment()" class="w-full bg-emerald-50 text-emerald-800 border border-emerald-200 py-2.5 rounded-xl text-sm hover:bg-emerald-100 transition font-bold flex justify-center items-center gap-2"><i class="fa-solid fa-file-csv"></i> ส่งออกคะแนนสำหรับแบบประเมิน</button>
+                        <p class="text-[10px] leading-4 text-slate-500">ใช้ไฟล์ DOPA Score CSV รูปแบบเดิม จึงไม่เปลี่ยนโครงสร้าง Firebase และไม่กระทบระบบให้คะแนนปัจจุบัน</p>
+                    </div>
+                </div>
+
                 <div>
                     <h4 class="font-bold text-slate-600 text-xs uppercase mb-2 pb-1 border-b">ค้นหาและตัวกรอง</h4>
                     <div class="space-y-3">
@@ -1151,6 +1161,22 @@
             } catch (err) {
                 setLoad(false); Swal.fire('ระบบขัดข้อง', String(err.message), 'error');
             }
+        }
+
+        // ===== V3.14 Integration: DOPA NASAN Assessment =====
+        const DOPA_ASSESSMENT_BASE_URL = "https://script.google.com/macros/s/AKfycbyW8YYs1rOtqqEyOn8JBQT3hbdBRwlkwETAVoqoxCkm72dRRuCG_bgFQYhDAHqFXV7e/exec";
+
+        function openDopaAssessment() {
+            window.open(DOPA_ASSESSMENT_BASE_URL + "?page=assessment", "_blank", "noopener");
+        }
+
+        function openDopaImportCenter() {
+            window.open(DOPA_ASSESSMENT_BASE_URL, "_blank", "noopener");
+        }
+
+        async function exportCSVForAssessment() {
+            // ใช้ exporter มาตรฐานเดิม เพื่อคงหัวคอลัมน์ที่ระบบประเมินใช้อยู่
+            return exportCSV();
         }
 
         async function exportCSV() {
